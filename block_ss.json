@@ -1,14 +1,64 @@
 {
   "frame":{
-    "width":  32,
-    "height": 32,
-    "cols": 10,
+    "width":  48,
+    "height": 48,
+    "cols": 11,
     "rows":  1
   },
   "animations":{
     "block_0":{
       "frames":[0],
       "next": "block_0",
+      "frequency": 4
+    },
+    "block_1":{
+      "frames":[1],
+      "next": "block_1",
+      "frequency": 4
+    },
+    "block_2":{
+      "frames":[2],
+      "next": "block_2",
+      "frequency": 4
+    },
+    "block_3":{
+      "frames":[3],
+      "next": "block_3",
+      "frequency": 4
+    },
+    "block_4":{
+      "frames":[4],
+      "next": "block_4",
+      "frequency": 4
+    },
+    "block_5":{
+      "frames":[5],
+      "next": "block_5",
+      "frequency": 4
+    },
+    "block_6":{
+      "frames":[6],
+      "next": "block_6",
+      "frequency": 4
+    },
+    "block_7":{
+      "frames":[7],
+      "next": "block_7",
+      "frequency": 4
+    },
+    "block_8":{
+      "frames":[8],
+      "next": "block_8",
+      "frequency": 4
+    },
+    "block_9":{
+      "frames":[9],
+      "next": "block_9",
+      "frequency": 4
+    },
+    "block_10":{
+      "frames":[10],
+      "next": "block_10",
       "frequency": 4
     }
   }

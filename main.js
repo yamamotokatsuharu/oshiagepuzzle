@@ -27,6 +27,7 @@ const MYSCENES = [
 const ASSETS = {
     image:{
         'block': 'img/block.png',
+        'field': 'img/field.png'
     },
     spritesheet:{
         'block_ss': 'block_ss.json',
@@ -73,7 +74,12 @@ phina.define('Main', {
         this.dummyGroup = DisplayElement().addChildTo(this);
         this.acceptKeyInput = true;
 
-        /* Prepare puzzle field */
+        /* Preare puzzle field */
+        var fieldImage = Sprite('field', 336, 576).addChildTo(this);
+        fieldImage.origin.set(0,0);
+        fieldImage.moveTo(FIELD_X - BLOCK_SIZE/2 - 16, FIELD_Y - BLOCK_SIZE/2);
+
+        /* Prepare puzzle field blocks*/
         var fieldMap = new Array(FIELD_WIDTH);  // puzzle field map
         var fieldBlocks = new Array(FIELD_WIDTH);   //sprites of blocks on field
         var fieldBlocksAnimation = new Array(FIELD_WIDTH);  // animations of bloks on field
@@ -112,6 +118,10 @@ phina.define('Main', {
         this.pushBlocksAnimation = pushBlocksAnimation;
         this.pushBlocksX = pushBlocksX;
 
+        /* other status */
+        this.pushUpCounter = 0;
+
+
         // 初期配置
         for(let x = 0; x < FIELD_WIDTH; x++){
             this.fieldMap[x].fill(EMPTY_ID);
@@ -123,6 +133,7 @@ phina.define('Main', {
     // 押し上げる
     pushToField: function(){
         console.log('push to field');
+        this.pushUpCounter++;
         for(let y = 0; y < FIELD_HEIGHT; y++){
             if (y < FIELD_HEIGHT - 1){
                 this.fieldMap[this.pushBlocksX    ][y] = this.fieldMap[this.pushBlocksX    ][y + 1];
@@ -134,9 +145,33 @@ phina.define('Main', {
         this.fieldMap[this.pushBlocksX    ][FIELD_HEIGHT - 1] = this.pushMap[0];
         this.fieldMap[this.pushBlocksX + 1][FIELD_HEIGHT - 1] = this.pushMap[1];
         this.pushBlocks[0].tweener.moveBy(0, -BLOCK_SIZE - DISTANCE_FROM_FB_TO_PB, 100)
+                                  .set({alpha: 0.0})
                                   .play();
         this.pushBlocks[1].tweener.moveBy(0, -BLOCK_SIZE - DISTANCE_FROM_FB_TO_PB, 100)
+                                  .set({alpha: 0.0})
                                   .play();
+        this.dummyGroup.tweener.wait(100).call(() => {this.fieldUpdate()}).play();
+    },
+    // お邪魔を1列生成して押し上げ
+    pushOjamaToField: function(){
+        console.log('push Ojama to field');
+        var ojamaBlocks = new Array(FIELD_WIDTH);
+        var ojamaBlocksAnimation = new Array(FIELD_WIDTH);
+        for(let x = 0; x < FIELD_WIDTH; x++){
+            ojamaBlocks[x] = Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this);
+            ojamaBlocksAnimation[x] = FrameAnimation('block_ss').attachTo(ojamaBlocks[x]).gotoAndPlay('block_' + OJAMA_ID);
+            for(let y = 0; y < FIELD_HEIGHT; y++){
+                if(y < FIELD_HEIGHT - 1){
+                    this.fieldMap[x][y] = this.fieldMap[x][y + 1];
+                }
+                this.fieldBlocks[x][y].tweener.moveBy(0, -BLOCK_SIZE, 100).play();
+            }
+            this.fieldMap[x][FIELD_HEIGHT - 1] = OJAMA_ID;
+            ojamaBlocks[x].tweener.set({x: FIELD_X + BLOCK_SIZE * x, y: PUSHBLOCKS_Y, alpha: 0.0})
+                                  .by({y: -BLOCK_SIZE - DISTANCE_FROM_FB_TO_PB, alpha: 1.0}, 100)
+                                  .set({alpha: 0.0})
+                                  .play();
+        }
         this.dummyGroup.tweener.wait(100).call(() => {this.fieldUpdate()}).play();
     },
 
@@ -197,6 +232,7 @@ phina.define('Main', {
     },
     // 消去・ブロック落下
     erase: function(){
+        this.pushUpCounter = 0;
         var fall;
         // 各スプライトの移動を制御
         for(let x = 0; x < FIELD_WIDTH; x++){
@@ -245,8 +281,6 @@ phina.define('Main', {
     // 盤面更新
     fieldUpdate: function(initFlag){
         console.log('Start Updating...');
-        this.pushBlocks[0].alpha = 0.0;
-        this.pushBlocks[1].alpha = 0.0;
         for(let x = 0; x < FIELD_WIDTH; x++){
             for(let y = 0; y < FIELD_HEIGHT; y++){
                 this.fieldBlocks[x][y].x = FIELD_X + BLOCK_SIZE * x;
@@ -266,20 +300,26 @@ phina.define('Main', {
     // ゲームオーバー判定
     isGameOver: function(){
         console.log('game over?');
-        var gameOver = 0;
+        
         if(gameOver){
 
         }
         else{
-            for(let i = 0; i < 2; i++){
-                this.pushMap[i] = Random.randint(0, 7);
-                if(!Random.randint(0, 6)) this.pushMap[i] = OJAMA_ID;
-                this.pushBlocksAnimation[i].gotoAndPlay('block_' + this.pushMap[i]);
-                this.pushBlocks[i].y = PUSHBLOCKS_Y;
-                this.pushBlocks[i].alpha = 1.0;
+            if(this.pushUpCounter > 4){
+                this.pushUpCounter = 0;
+                this.pushOjamaToField(); // if push up with no erase 4 times, put ojama
             }
-            this.acceptKeyInput = true;
-            return;
+            else{
+                for(let i = 0; i < 2; i++){
+                    this.pushMap[i] = Random.randint(0, 7);
+                    if(!Random.randint(0, 6)) this.pushMap[i] = OJAMA_ID;
+                    this.pushBlocksAnimation[i].gotoAndPlay('block_' + this.pushMap[i]);
+                    this.pushBlocks[i].y = PUSHBLOCKS_Y;
+                    this.pushBlocks[i].tweener.set({alpha: 1.0}).play();
+                }
+                this.acceptKeyInput = true;
+                return;
+            }
         }
     },
     // 毎フレーム呼び出し

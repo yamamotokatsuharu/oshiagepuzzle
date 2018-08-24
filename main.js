@@ -46,6 +46,9 @@ const FIELD_WIDTH = 6;
 const FIELD_HEIGHT = 11;
 const DISTANCE_FROM_FB_TO_PB = 24; // distance from bottom of field to push blocks
 const PUSHBLOCKS_Y = FIELD_Y + FIELD_HEIGHT * BLOCK_SIZE + DISTANCE_FROM_FB_TO_PB;
+const DISTANCE_BETWEEN_NEXTBLOCKS = 48;
+const NEXTBLOCKS_X = FIELD_X + FIELD_WIDTH * BLOCK_SIZE + DISTANCE_BETWEEN_NEXTBLOCKS;
+const VISIBLE_NEXT = 2;
 
 phina.define('Title', {
     superClass: 'DisplayScene',
@@ -118,6 +121,25 @@ phina.define('Main', {
         this.pushBlocksAnimation = pushBlocksAnimation;
         this.pushBlocksX = pushBlocksX;
 
+        /* next blocks */
+        var nextMap = new Array(VISIBLE_NEXT);
+        var nextBlocks = new Array(VISIBLE_NEXT);
+        var nextBlocksAnimation = new Array(VISIBLE_NEXT);
+        for(let i = 0; i < VISIBLE_NEXT; i++){
+            nextMap[i] = new Array(2);
+            nextBlocks[i] = new Array(2);
+            nextBlocksAnimation[i] = new Array(2);
+            for(let j = 0; j < 2; j++){
+                nextMap[i][j] = Random.randint(0, 6);
+                nextBlocks[i][j] = Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this);
+                nextBlocksAnimation[i][j] = FrameAnimation('block_ss').attachTo(nextBlocks[i][j]).gotoAndPlay('block_' + nextMap[i][j]);
+                nextBlocks[i][j].moveTo(NEXTBLOCKS_X + 128 * i + BLOCK_SIZE * j, PUSHBLOCKS_Y);
+            }
+        }
+        this.nextMap = nextMap;
+        this.nextBlocks = nextBlocks;
+        this.nextBlocksAnimation = nextBlocksAnimation;
+
         /* other status */
         this.pushUpCounter = 0;
 
@@ -158,8 +180,6 @@ phina.define('Main', {
         var ojamaBlocks = new Array(FIELD_WIDTH);
         var ojamaBlocksAnimation = new Array(FIELD_WIDTH);
         for(let x = 0; x < FIELD_WIDTH; x++){
-            ojamaBlocks[x] = Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this);
-            ojamaBlocksAnimation[x] = FrameAnimation('block_ss').attachTo(ojamaBlocks[x]).gotoAndPlay('block_' + OJAMA_ID);
             for(let y = 0; y < FIELD_HEIGHT; y++){
                 if(y < FIELD_HEIGHT - 1){
                     this.fieldMap[x][y] = this.fieldMap[x][y + 1];
@@ -167,6 +187,8 @@ phina.define('Main', {
                 this.fieldBlocks[x][y].tweener.moveBy(0, -BLOCK_SIZE, 100).play();
             }
             this.fieldMap[x][FIELD_HEIGHT - 1] = OJAMA_ID;
+            ojamaBlocks[x] = Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this).moveTo(-100, -100);
+            ojamaBlocksAnimation[x] = FrameAnimation('block_ss').attachTo(ojamaBlocks[x]).gotoAndPlay('block_' + OJAMA_ID);
             ojamaBlocks[x].tweener.set({x: FIELD_X + BLOCK_SIZE * x, y: PUSHBLOCKS_Y, alpha: 0.0})
                                   .by({y: -BLOCK_SIZE - DISTANCE_FROM_FB_TO_PB, alpha: 1.0}, 100)
                                   .set({alpha: 0.0})
@@ -300,22 +322,29 @@ phina.define('Main', {
     // ゲームオーバー判定
     isGameOver: function(){
         console.log('game over?');
-        
+        var gameOver = 0;
         if(gameOver){
 
         }
         else{
             if(this.pushUpCounter > 4){
                 this.pushUpCounter = 0;
-                this.pushOjamaToField(); // if push up with no erase 4 times, put ojama
+                this.pushOjamaToField(); // if push up with no erase 5 times, put ojama
             }
+            // prepare next pushBlocks and return
             else{
-                for(let i = 0; i < 2; i++){
-                    this.pushMap[i] = Random.randint(0, 7);
-                    if(!Random.randint(0, 6)) this.pushMap[i] = OJAMA_ID;
-                    this.pushBlocksAnimation[i].gotoAndPlay('block_' + this.pushMap[i]);
-                    this.pushBlocks[i].y = PUSHBLOCKS_Y;
-                    this.pushBlocks[i].tweener.set({alpha: 1.0}).play();
+                for(let j = 0; j < 2; j++){
+                    this.pushMap[j] = this.nextMap[0][j];
+                    this.pushBlocksAnimation[j].gotoAndPlay('block_' + this.pushMap[j]);
+                    this.pushBlocks[j].y = PUSHBLOCKS_Y;
+                    this.pushBlocks[j].tweener.set({alpha: 1.0}).play();
+                    for(let i = 0; i < VISIBLE_NEXT - 1; i++){
+                        this.nextMap[i][j] = this.nextMap[i + 1][j];
+                        this.nextBlocksAnimation[i][j].gotoAndPlay('block_' + this.nextMap[i][j]);
+                    }
+                    this.nextMap[VISIBLE_NEXT - 1][j] = Random.randint(0, 7);
+                    if(!Random.randint(0, 6)) this.nextMap[VISIBLE_NEXT - 1][j] = OJAMA_ID;
+                    this.nextBlocksAnimation[VISIBLE_NEXT - 1][j].gotoAndPlay('block_' + this.nextMap[VISIBLE_NEXT - 1][j]);
                 }
                 this.acceptKeyInput = true;
                 return;

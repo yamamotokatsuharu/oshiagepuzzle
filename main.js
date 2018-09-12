@@ -27,7 +27,8 @@ const MYSCENES = [
 const ASSETS = {
     image:{
         'block': 'img/block.png',
-        'field': 'img/field.png'
+        'field': 'img/field.png',
+        'background': 'img/background.png'
     },
     spritesheet:{
         'block_ss': 'block_ss.json',
@@ -35,16 +36,16 @@ const ASSETS = {
 };
 
 
-const BLOCK_COLORS = 11;
+const BLOCK_COLORS = 10;
 const BLOCK_SIZE = 48;
 const EMPTY_ID = -1;
 const OJAMA_ID = 10;
 
 const FIELD_X = 120;
-const FIELD_Y = 0;
+const FIELD_Y = 16;
 const FIELD_WIDTH = 6;
 const FIELD_HEIGHT = 11;
-const DISTANCE_FROM_FB_TO_PB = 24; // distance from bottom of field to push blocks
+const DISTANCE_FROM_FB_TO_PB = 16; // distance from bottom of field to push blocks
 const PUSHBLOCKS_Y = FIELD_Y + FIELD_HEIGHT * BLOCK_SIZE + DISTANCE_FROM_FB_TO_PB;
 const DISTANCE_BETWEEN_NEXTBLOCKS = 48;
 const NEXTBLOCKS_X = FIELD_X + FIELD_WIDTH * BLOCK_SIZE + DISTANCE_BETWEEN_NEXTBLOCKS;
@@ -78,9 +79,22 @@ phina.define('Main', {
         this.acceptKeyInput = true;
 
         /* Preare puzzle field */
-        var fieldImage = Sprite('field', 336, 576).addChildTo(this);
+        var backGroundPaper = Sprite('background').addChildTo(this).setPosition(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+        var fieldImage = Sprite('field', 320, 512).addChildTo(this);
         fieldImage.origin.set(0,0);
-        fieldImage.moveTo(FIELD_X - BLOCK_SIZE/2 - 16, FIELD_Y - BLOCK_SIZE/2);
+        fieldImage.moveTo(FIELD_X - BLOCK_SIZE/2 - 16, FIELD_Y + 8);
+
+        /* shuffle block color */
+        var blockOrder = new Array(BLOCK_COLORS);
+        var j, temp;
+        for(let i = 0; i < BLOCK_COLORS; i++) blockOrder[i] = i;
+        for(let i = 0; i < BLOCK_COLORS; i++){
+            j = Random.randint(0, BLOCK_COLORS - 1); 
+            temp = blockOrder[i];
+            blockOrder[i] = blockOrder[j];
+            blockOrder[j] = temp;
+        }
+        this.blockOrder = blockOrder;
 
         /* Prepare puzzle field blocks*/
         var fieldMap = new Array(FIELD_WIDTH);  // puzzle field map
@@ -130,7 +144,7 @@ phina.define('Main', {
             nextBlocks[i] = new Array(2);
             nextBlocksAnimation[i] = new Array(2);
             for(let j = 0; j < 2; j++){
-                nextMap[i][j] = Random.randint(0, 6);
+                nextMap[i][j] = this.blockOrder[Random.randint(0, 5)];
                 nextBlocks[i][j] = Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this);
                 nextBlocksAnimation[i][j] = FrameAnimation('block_ss').attachTo(nextBlocks[i][j]).gotoAndPlay('block_' + nextMap[i][j]);
                 nextBlocks[i][j].moveTo(NEXTBLOCKS_X + 128 * i + BLOCK_SIZE * j, PUSHBLOCKS_Y);
@@ -141,17 +155,47 @@ phina.define('Main', {
         this.nextBlocksAnimation = nextBlocksAnimation;
 
         /* other status */
-        this.pushUpCounter = 0;
+        this.pushUpCounter = 0; // 消さずに押し上げた回数のカウント
+        this.combo = 0; // コンボ
+        this.comboFlag = false; // コンボ持続状態の管理(false時に消せなかった場合、コンボが途切れる)
+        this.score = 0; // 現在のスコア
+        this.addScore = 0; // ブロック消去により加算されるスコア
 
+        /* labels */
+        // combo label
+        this.comboLabel = Label({
+            text: '',
+            fontSize: 32,
+            fill: 'yellow'
+        }).addChildTo(this);
+        this.comboLabel.origin.set(1, 0);
+        this.comboLabel.setPosition(840, 160);
+        // score label
+        this.scoreLabel = Label({
+            text: 'Score: ' + ( '00000000' + this.score ).slice(-8),
+            fontSize: 32,
+            fill: 'white'
+        }).addChildTo(this);
+        this.scoreLabel.origin.set(1, 0);
+        this.scoreLabel.setPosition(840, 120);
+        // additional score label
+        this.addScoreLabel = Label({
+            text: '',
+            fontsize: 32,
+            fill: 'white'
+        }).addChildTo(this);
+        this.addScoreLabel.origin.set(1, 0);
+        this.addScoreLabel.setPosition(-255, -255);
 
         // 初期配置
         for(let x = 0; x < FIELD_WIDTH; x++){
             this.fieldMap[x].fill(EMPTY_ID);
-            this.fieldMap[x][FIELD_HEIGHT - 1] = x;
+            this.fieldMap[x][FIELD_HEIGHT - 1] = this.blockOrder[x];
         }
         this.fieldUpdate();
 
     },
+
     // 押し上げる
     pushToField: function(){
         console.log('push to field');
@@ -174,6 +218,7 @@ phina.define('Main', {
                                   .play();
         this.dummyGroup.tweener.wait(100).call(() => {this.fieldUpdate()}).play();
     },
+
     // お邪魔を1列生成して押し上げ
     pushOjamaToField: function(){
         console.log('push Ojama to field');
@@ -231,9 +276,21 @@ phina.define('Main', {
                 }
             }
         }
-        // お邪魔消去判定
+        // 加算スコアの計算・お邪魔消去判定
+        this.addScore = 0;
+        if(matchFlag){
+            this.combo++;
+            this.comboLabel.text = this.combo + ' combo';
+        }
+        else if(!this.comboFlag){
+            this.combo = 0;
+            this.comboLabel.text = '';
+        }
         for(let x = 0; x < FIELD_WIDTH; x++){
             for(let y = 0; y < FIELD_HEIGHT; y++){
+                // culculate additional score
+                this.addScore += ((this.fieldMap[x][y] != OJAMA_ID) && setErase[x][y]) * 10;
+                // search ojama which is erased
                 if(this.fieldMap[x][y] == OJAMA_ID){
                     for(let d = 0; d < 4; d++){
                         if(x + direction[d] >= 0 && x + direction[d] < FIELD_WIDTH && y + direction[d ^ 1] >= 0 && y + direction[d ^ 1] < FIELD_HEIGHT){
@@ -243,6 +300,11 @@ phina.define('Main', {
                 }
             }
         }
+        this.addScoreLabel.text = this.addScore + ' x ';
+        this.addScore *= (this.combo > 7 ? 7 : this.combo);
+        this.addScoreLabel.text += (this.combo > 7 ? 7 : this.combo);
+        this.score += this.addScore;
+
         console.log(setErase);
         this.setErase = setErase;
         if(matchFlag){
@@ -255,6 +317,7 @@ phina.define('Main', {
     // 消去・ブロック落下
     erase: function(){
         this.pushUpCounter = 0;
+        this.comboFlag = true;
         var fall;
         // 各スプライトの移動を制御
         for(let x = 0; x < FIELD_WIDTH; x++){
@@ -295,6 +358,13 @@ phina.define('Main', {
             }
         }
         console.log(this.fieldMap);
+        // additional score animation
+        this.addScoreLabel.moveTo(840, 100);
+        this.addScoreLabel.tweener.call(() => {this.addScoreLabel.alpha = 1;})
+                                  .to({y: 50, alpha: 0}, 500)
+                                  .play();
+        // update score
+        this.scoreLabel.text = 'Score: ' + ( '00000000' + this.score ).slice(-8);
         // wait 1000ms -> goto fieldUpdate
         this.dummyGroup.tweener.wait(1000)
                                .call(() => {this.fieldUpdate(0);})
@@ -327,6 +397,7 @@ phina.define('Main', {
 
         }
         else{
+            this.comboFlag = false;
             if(this.pushUpCounter > 4){
                 this.pushUpCounter = 0;
                 this.pushOjamaToField(); // if push up with no erase 5 times, put ojama
@@ -342,7 +413,7 @@ phina.define('Main', {
                         this.nextMap[i][j] = this.nextMap[i + 1][j];
                         this.nextBlocksAnimation[i][j].gotoAndPlay('block_' + this.nextMap[i][j]);
                     }
-                    this.nextMap[VISIBLE_NEXT - 1][j] = Random.randint(0, 7);
+                    this.nextMap[VISIBLE_NEXT - 1][j] = this.blockOrder[Random.randint(0, 5)];
                     if(!Random.randint(0, 6)) this.nextMap[VISIBLE_NEXT - 1][j] = OJAMA_ID;
                     this.nextBlocksAnimation[VISIBLE_NEXT - 1][j].gotoAndPlay('block_' + this.nextMap[VISIBLE_NEXT - 1][j]);
                 }

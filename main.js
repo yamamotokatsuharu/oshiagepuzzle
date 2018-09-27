@@ -49,7 +49,7 @@ const DISTANCE_FROM_FB_TO_PB = 16; // distance from bottom of field to push bloc
 const PUSHBLOCKS_Y = FIELD_Y + FIELD_HEIGHT * BLOCK_SIZE + DISTANCE_FROM_FB_TO_PB;
 const DISTANCE_BETWEEN_NEXTBLOCKS = 48;
 const NEXTBLOCKS_X = FIELD_X + FIELD_WIDTH * BLOCK_SIZE + DISTANCE_BETWEEN_NEXTBLOCKS;
-const VISIBLE_NEXT = 2;
+const VISIBLE_NEXT = 4;
 
 phina.define('Title', {
     superClass: 'DisplayScene',
@@ -75,12 +75,15 @@ phina.define('Main', {
             height: SCREEN_HEIGHT
         });
         this.backgroundColor = 'black';
-        this.dummyGroup = DisplayElement().addChildTo(this);
+
+        var backGroundPaper = Sprite('background').addChildTo(this).setPosition(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+
+        this.dummyGroup = DisplayElement().addChildTo(this); // dummy group for waiting
+        this.puzzleFieldGroup = DisplayElement().addChildTo(this); // dummy group for gameover animation
         this.acceptKeyInput = true;
 
         /* Preare puzzle field */
-        var backGroundPaper = Sprite('background').addChildTo(this).setPosition(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
-        var fieldImage = Sprite('field', 320, 512).addChildTo(this);
+        var fieldImage = Sprite('field', 320, 512).addChildTo(this.puzzleFieldGroup);
         fieldImage.origin.set(0,0);
         fieldImage.moveTo(FIELD_X - BLOCK_SIZE/2 - 16, FIELD_Y + 8);
 
@@ -89,7 +92,7 @@ phina.define('Main', {
         var j, temp;
         for(let i = 0; i < BLOCK_COLORS; i++) blockOrder[i] = i;
         for(let i = 0; i < BLOCK_COLORS; i++){
-            j = Random.randint(0, BLOCK_COLORS - 1); 
+            j = Random.randint(0, BLOCK_COLORS - 1);
             temp = blockOrder[i];
             blockOrder[i] = blockOrder[j];
             blockOrder[j] = temp;
@@ -107,7 +110,7 @@ phina.define('Main', {
         }
         for(let i = 0; i < FIELD_WIDTH; i++){
             for(let j = 0; j < FIELD_HEIGHT; j++){
-                fieldBlocks[i][j] =  Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this);
+                fieldBlocks[i][j] =  Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this.puzzleFieldGroup);
                 fieldBlocksAnimation[i][j] = FrameAnimation('block_ss').attachTo(fieldBlocks[i][j]);
                 fieldBlocksAnimation[i][j].gotoAndPlay('block_' + fieldMap[i][j]);
                 fieldBlocks[i][j].x = FIELD_X + BLOCK_SIZE * i;
@@ -160,13 +163,15 @@ phina.define('Main', {
         this.comboFlag = false; // コンボ持続状態の管理(false時に消せなかった場合、コンボが途切れる)
         this.score = 0; // 現在のスコア
         this.addScore = 0; // ブロック消去により加算されるスコア
+        this.goToTitle = false; // ゲームオーバーの時、タイトルに戻る操作が有効かどうか管理するフラグ
 
         /* labels */
         // combo label
         this.comboLabel = Label({
             text: '',
             fontSize: 32,
-            fill: 'yellow'
+            fill: 'yellow',
+            fontFamily: "'Courier New'"
         }).addChildTo(this);
         this.comboLabel.origin.set(1, 0);
         this.comboLabel.setPosition(840, 160);
@@ -174,7 +179,8 @@ phina.define('Main', {
         this.scoreLabel = Label({
             text: 'Score: ' + ( '00000000' + this.score ).slice(-8),
             fontSize: 32,
-            fill: 'white'
+            fill: 'white',
+            fontFamily: "'Courier New'"
         }).addChildTo(this);
         this.scoreLabel.origin.set(1, 0);
         this.scoreLabel.setPosition(840, 120);
@@ -182,7 +188,8 @@ phina.define('Main', {
         this.addScoreLabel = Label({
             text: '',
             fontsize: 32,
-            fill: 'white'
+            fill: 'white',
+            fontFamily: "'Courier New'"
         }).addChildTo(this);
         this.addScoreLabel.origin.set(1, 0);
         this.addScoreLabel.setPosition(-255, -255);
@@ -392,9 +399,44 @@ phina.define('Main', {
     // ゲームオーバー判定
     isGameOver: function(){
         console.log('game over?');
-        var gameOver = 0;
+        var gameOver = false;
+        for(let i = 0; i < FIELD_WIDTH; i++){
+            gameOver |= (this.fieldMap[i][0] != EMPTY_ID);
+        }
         if(gameOver){
-
+            let self = this;
+            let gameOverLabel = Label({
+                text: 'GAME OVER',
+                fontSize: 48,
+                fill: 'tomato',
+                fontFamily: "'Courier New'"
+            }).addChildTo(this).setPosition(FIELD_X + BLOCK_SIZE * FIELD_WIDTH / 2 - BLOCK_SIZE / 2, FIELD_Y + BLOCK_SIZE * FIELD_HEIGHT / 2);
+            let pressSpaceKeyLabel = Label({
+                text: 'Press space key',
+                fontSize: 24,
+                fill: 'white',
+                fontFamily: "'Courier New'"
+            }).addChildTo(this).setPosition(FIELD_X + BLOCK_SIZE * FIELD_WIDTH / 2 - BLOCK_SIZE / 2, FIELD_Y + BLOCK_SIZE * FIELD_HEIGHT / 2 + 64);
+            gameOverLabel.alpha = 0.0;
+            pressSpaceKeyLabel.alpha = 0.0;
+            this.puzzleFieldGroup.tweener.wait(100)
+                                         .moveBy(0,  16, 40)
+                                         .moveBy(0, -32, 40)
+                                         .moveBy(0,  24, 40)
+                                         .moveBy(0, -16, 40)
+                                         .moveBy(0,   8, 40)
+                                         .wait(200)
+                                         .by({x:0, y:800}, 1000, 'easeInCubic')
+                                         .call(() => {
+                                             gameOverLabel.tweener.by({alpha: 1.0}, 300).play();
+                                         })
+                                         .wait(2000)
+                                         .call(() => {
+                                             pressSpaceKeyLabel.tweener.by({alpha: 1.0}, 300).play();
+                                             this.goToTitle = true;
+                                         })
+                                         .play();
+            return;
         }
         else{
             this.comboFlag = false;
@@ -413,7 +455,7 @@ phina.define('Main', {
                         this.nextMap[i][j] = this.nextMap[i + 1][j];
                         this.nextBlocksAnimation[i][j].gotoAndPlay('block_' + this.nextMap[i][j]);
                     }
-                    this.nextMap[VISIBLE_NEXT - 1][j] = this.blockOrder[Random.randint(0, 5)];
+                    this.nextMap[VISIBLE_NEXT - 1][j] = this.blockOrder[Random.randint(0, 7)];
                     if(!Random.randint(0, 6)) this.nextMap[VISIBLE_NEXT - 1][j] = OJAMA_ID;
                     this.nextBlocksAnimation[VISIBLE_NEXT - 1][j].gotoAndPlay('block_' + this.nextMap[VISIBLE_NEXT - 1][j]);
                 }
@@ -481,6 +523,9 @@ phina.define('Main', {
                                           })
                                           .play();
             }
+            if(key.getKeyDown('space')) this.exit();
+        }
+        if(this.goToTitle){
             if(key.getKeyDown('space')) this.exit();
         }
     }

@@ -307,7 +307,14 @@ phina.define('Main', {
                 }
             }
         }
-        this.addScoreLabel.text = this.addScore + ' x ';
+        this.addScoreLabel.text = this.addScore + ' x';
+        // 5個以上の大量同時消しボーナス
+        let bairitsu = 1.5; // ボーナス倍率
+        if(this.addScore >= 50){
+            this.addScore = Math.floor(this.addScore * bairitsu);
+            this.addScoreLabel.text = this.addScoreLabel.text + bairitsu + ' x';
+        }
+        // コンボボーナス（最大7）
         this.addScore *= (this.combo > 7 ? 7 : this.combo);
         this.addScoreLabel.text += (this.combo > 7 ? 7 : this.combo);
         this.score += this.addScore;
@@ -367,8 +374,10 @@ phina.define('Main', {
         console.log(this.fieldMap);
         // additional score animation
         this.addScoreLabel.moveTo(840, 100);
-        this.addScoreLabel.tweener.call(() => {this.addScoreLabel.alpha = 1;})
-                                  .to({y: 50, alpha: 0}, 500)
+        this.addScoreLabel.tweener.set({alpha: 0.0})
+                                  .by({y: -16, alpha: 1.0}, 100)
+                                  .wait(500)
+                                  .by({y: -16, alpha: -1.0}, 100)
                                   .play();
         // update score
         this.scoreLabel.text = 'Score: ' + ( '00000000' + this.score ).slice(-8);

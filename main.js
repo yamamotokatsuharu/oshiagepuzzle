@@ -236,17 +236,17 @@ phina.define('Main', {
                 if(y < FIELD_HEIGHT - 1){
                     this.fieldMap[x][y] = this.fieldMap[x][y + 1];
                 }
-                this.fieldBlocks[x][y].tweener.moveBy(0, -BLOCK_SIZE, 100).play();
+                this.fieldBlocks[x][y].tweener.moveBy(0, -BLOCK_SIZE, 200, 'easeOutCubic').play();
             }
             this.fieldMap[x][FIELD_HEIGHT - 1] = OJAMA_ID;
             ojamaBlocks[x] = Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this).moveTo(-100, -100);
             ojamaBlocksAnimation[x] = FrameAnimation('block_ss').attachTo(ojamaBlocks[x]).gotoAndPlay('block_' + OJAMA_ID);
             ojamaBlocks[x].tweener.set({x: FIELD_X + BLOCK_SIZE * x, y: PUSHBLOCKS_Y, alpha: 0.0})
-                                  .by({y: -BLOCK_SIZE - DISTANCE_FROM_FB_TO_PB, alpha: 1.0}, 100)
+                                  .by({y: -BLOCK_SIZE - DISTANCE_FROM_FB_TO_PB, alpha: 1.0}, 200, 'easeOutCubic')
                                   .set({alpha: 0.0})
                                   .play();
         }
-        this.dummyGroup.tweener.wait(100).call(() => {this.fieldUpdate()}).play();
+        this.dummyGroup.tweener.wait(200).call(() => {this.fieldUpdate()}).play();
     },
 
     // 消えるブロックを探す
@@ -333,19 +333,23 @@ phina.define('Main', {
         this.pushUpCounter = 0;
         this.comboFlag = true;
         var fall;
+        var animateTime_1 = 300, animateTime_2 = 500, animateTime_3 = 300;
         // 各スプライトの移動を制御
         for(let x = 0; x < FIELD_WIDTH; x++){
             for(let y = 0; y < FIELD_HEIGHT; y++){
                 // 消去アニメーション
                 if(this.setErase[x][y]){
                     if(this.fieldMap[x][y] != OJAMA_ID){ // not Ojama
-                        this.fieldBlocks[x][y].tweener.to({rotation: 360, scaleX: 0, scaleY: 0}, 500)
+                        this.fieldBlocks[x][y].tweener.to({scaleX: 0.8, scaleY: 0.8}, animateTime_1 / 2)
+                                                      .to({scaleX: 1.0, scaleY: 1.0}, animateTime_1 / 2)
+                                                      .to({rotation: 360, scaleX: 0, scaleY: 0}, animateTime_2)
                                                       .call(() => {this.fieldBlocks[x][y].alpha = 0;})
                                                       .play();
                     }
                     else{ // Ojama
-                        this.fieldBlocks[x][y].tweener.to({alpha: 0}, 500)
-                                                      .play();
+                        this.fieldBlocks[x][y].tweener.wait(animateTime_1)
+                                                      .to({alpha: 0}, animateTime_2)
+                                                      .play()
                     }
                 }
                 // 落下アニメーション
@@ -354,8 +358,8 @@ phina.define('Main', {
                     for(let i = y; i < FIELD_HEIGHT; i++){
                         fall += this.setErase[x][i];
                     }
-                    this.fieldBlocks[x][y].tweener.wait(500)
-                                                  .moveBy(0, BLOCK_SIZE * fall, 300, 'easeInCubic')
+                    this.fieldBlocks[x][y].tweener.wait(animateTime_1 + animateTime_2)
+                                                  .moveBy(0, BLOCK_SIZE * fall, animateTime_3, 'easeInCubic')
                                                   .play();
                 }
             }
@@ -376,13 +380,13 @@ phina.define('Main', {
         this.addScoreLabel.moveTo(840, 100);
         this.addScoreLabel.tweener.set({alpha: 0.0})
                                   .by({y: -16, alpha: 1.0}, 100)
-                                  .wait(500)
+                                  .wait(animateTime_1 + animateTime_2)
                                   .by({y: -16, alpha: -1.0}, 100)
                                   .play();
         // update score
         this.scoreLabel.text = 'Score: ' + ( '00000000' + this.score ).slice(-8);
-        // wait 1000ms -> goto fieldUpdate
-        this.dummyGroup.tweener.wait(1000)
+        // wait -> goto fieldUpdate
+        this.dummyGroup.tweener.wait(animateTime_1 + animateTime_2 + animateTime_3 + 100)
                                .call(() => {this.fieldUpdate(0);})
                                .play();
     },
@@ -464,8 +468,8 @@ phina.define('Main', {
                         this.nextMap[i][j] = this.nextMap[i + 1][j];
                         this.nextBlocksAnimation[i][j].gotoAndPlay('block_' + this.nextMap[i][j]);
                     }
-                    this.nextMap[VISIBLE_NEXT - 1][j] = this.blockOrder[Random.randint(0, 7)];
-                    if(!Random.randint(0, 6)) this.nextMap[VISIBLE_NEXT - 1][j] = OJAMA_ID;
+                    this.nextMap[VISIBLE_NEXT - 1][j] = this.blockOrder[Random.randint(0, BLOCK_COLORS - 1)];
+                    if(!Random.randint(0, 99)) this.nextMap[VISIBLE_NEXT - 1][j] = OJAMA_ID;
                     this.nextBlocksAnimation[VISIBLE_NEXT - 1][j].gotoAndPlay('block_' + this.nextMap[VISIBLE_NEXT - 1][j]);
                 }
                 this.acceptKeyInput = true;

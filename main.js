@@ -14,7 +14,7 @@ const MYSCENES = [
     {
         className: 'Main',
         label: 'main',
-        nextLabel: 'result'
+        nextLabel: 'title'
     },
     {
         className: 'Result',
@@ -33,6 +33,13 @@ const ASSETS = {
     spritesheet:{
         'block_ss': 'block_ss.json',
     },
+    sound:{
+        'moveAndSwap': 'se/enemyshot_trim.mov',
+        'push': 'se/shot_trim.mov',
+        'gameOver': 'se/damage.mp3',
+        'erase': 'se/jump.mp3',
+        'ojama': 'se/enemyhit_trim.mov'
+    }
 };
 
 
@@ -58,7 +65,28 @@ phina.define('Title', {
             width: SCREEN_WIDTH,
             height: SCREEN_HEIGHT
         });
-        this.backgroundColor = 'yellow';
+        this.backgroundColor = 'black';
+        // title label
+        this.titleLabel = Label({
+            text: 'Oshiage Puzzle',
+            fontSize: 64,
+            fill: 'yellow',
+            stroke: 'blue',
+            strokeWidth: 8,
+            fontFamily: "'Courier New'"
+        }).addChildTo(this);
+        this.titleLabel.origin.set(0.5, 0.5);
+        this.titleLabel.setPosition(480, 200);
+        // press label
+        this.pressLabel = Label({
+            text: 'Press space key to start',
+            fontSize: 48,
+            fill: 'white',
+            strokeWidth: 8,
+            fontFamily: "'Courier New'"
+        }).addChildTo(this);
+        this.pressLabel.origin.set(0.5, 0.5);
+        this.pressLabel.setPosition(480, 400);
     },
     update: function(app){
         var key = app.keyboard;
@@ -193,6 +221,16 @@ phina.define('Main', {
         }).addChildTo(this);
         this.addScoreLabel.origin.set(1, 0);
         this.addScoreLabel.setPosition(-255, -255);
+        // howto label
+        this.howToLabel = Label({
+            text: '[A][D] = move\n   [S] = swap\n   [W] = push',
+            align: 'left',
+            fontsize: 24,
+            fill: 'white',
+            fontFamily: "'Courier New'"
+        }).addChildTo(this);
+        this.howToLabel.origin.set(1,0);
+        this.howToLabel.setPosition(840, 380);
 
         // 初期配置
         for(let x = 0; x < FIELD_WIDTH; x++){
@@ -228,6 +266,7 @@ phina.define('Main', {
 
     // お邪魔を1列生成して押し上げ
     pushOjamaToField: function(){
+        SoundManager.play('ojama');
         console.log('push Ojama to field');
         var ojamaBlocks = new Array(FIELD_WIDTH);
         var ojamaBlocksAnimation = new Array(FIELD_WIDTH);
@@ -334,6 +373,7 @@ phina.define('Main', {
         this.comboFlag = true;
         var fall;
         var animateTime_1 = 300, animateTime_2 = 500, animateTime_3 = 300;
+        SoundManager.play('erase');
         // 各スプライトの移動を制御
         for(let x = 0; x < FIELD_WIDTH; x++){
             for(let y = 0; y < FIELD_HEIGHT; y++){
@@ -430,6 +470,7 @@ phina.define('Main', {
                 fill: 'white',
                 fontFamily: "'Courier New'"
             }).addChildTo(this).setPosition(FIELD_X + BLOCK_SIZE * FIELD_WIDTH / 2 - BLOCK_SIZE / 2, FIELD_Y + BLOCK_SIZE * FIELD_HEIGHT / 2 + 64);
+            SoundManager.play('gameOver');
             gameOverLabel.alpha = 0.0;
             pressSpaceKeyLabel.alpha = 0.0;
             this.puzzleFieldGroup.tweener.wait(100)
@@ -468,8 +509,8 @@ phina.define('Main', {
                         this.nextMap[i][j] = this.nextMap[i + 1][j];
                         this.nextBlocksAnimation[i][j].gotoAndPlay('block_' + this.nextMap[i][j]);
                     }
-                    this.nextMap[VISIBLE_NEXT - 1][j] = this.blockOrder[Random.randint(0, BLOCK_COLORS - 1)];
-                    if(!Random.randint(0, 99)) this.nextMap[VISIBLE_NEXT - 1][j] = OJAMA_ID;
+                    this.nextMap[VISIBLE_NEXT - 1][j] = this.blockOrder[Random.randint(0, 7)];
+                    if(!Random.randint(0, 10)) this.nextMap[VISIBLE_NEXT - 1][j] = OJAMA_ID;
                     this.nextBlocksAnimation[VISIBLE_NEXT - 1][j].gotoAndPlay('block_' + this.nextMap[VISIBLE_NEXT - 1][j]);
                 }
                 this.acceptKeyInput = true;
@@ -484,11 +525,13 @@ phina.define('Main', {
         if(this.acceptKeyInput == true){
             // push
             if(key.getKeyDown('W')){
+                SoundManager.play('push');
                 this.acceptKeyInput = false;
                 this.pushToField();
             }
             // move to left
             if(key.getKeyDown('A') && this.pushBlocksX > 0){
+                SoundManager.play('moveAndSwap');
                 // refuse key input for 0.1 sec.
                 this.dummyGroup.tweener.call(() => {this.acceptKeyInput = false})
                                        .wait(100)
@@ -501,6 +544,7 @@ phina.define('Main', {
             }
             // move to right
             if(key.getKeyDown('D') && this.pushBlocksX < FIELD_WIDTH - 2){
+                SoundManager.play('moveAndSwap');
                 // refuse key input for 0.1 sec.
                 this.dummyGroup.tweener.call(() => {this.acceptKeyInput = false})
                                        .wait(100)
@@ -513,6 +557,7 @@ phina.define('Main', {
             }
             // swap
             if(key.getKeyDown('S')){
+                SoundManager.play('moveAndSwap');
                 // refuse key input for 0.1 sec.
                 this.dummyGroup.tweener.call(() => {this.acceptKeyInput = false})
                                        .wait(100)
@@ -536,7 +581,7 @@ phina.define('Main', {
                                           })
                                           .play();
             }
-            if(key.getKeyDown('space')) this.exit();
+            // if(key.getKeyDown('space')) this.exit();
         }
         if(this.goToTitle){
             if(key.getKeyDown('space')) this.exit();

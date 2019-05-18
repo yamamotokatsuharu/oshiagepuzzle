@@ -57,6 +57,7 @@ const PUSHBLOCKS_Y = FIELD_Y + FIELD_HEIGHT * BLOCK_SIZE + DISTANCE_FROM_FB_TO_P
 const DISTANCE_BETWEEN_NEXTBLOCKS = 48;
 const NEXTBLOCKS_X = FIELD_X + FIELD_WIDTH * BLOCK_SIZE + DISTANCE_BETWEEN_NEXTBLOCKS;
 const VISIBLE_NEXT = 4;
+const LEVEL_MAX = 4;
 
 phina.define('Title', {
     superClass: 'DisplayScene',
@@ -108,7 +109,8 @@ phina.define('Main', {
 
         this.dummyGroup = DisplayElement().addChildTo(this); // dummy group for waiting
         this.puzzleFieldGroup = DisplayElement().addChildTo(this); // dummy group for gameover animation
-        this.acceptKeyInput = true;
+        this.acceptKeyInput = false;
+        this.firstFieldUpdate = true;
 
         /* Preare puzzle field */
         var fieldImage = Sprite('field', 320, 512).addChildTo(this.puzzleFieldGroup);
@@ -185,13 +187,26 @@ phina.define('Main', {
         this.nextBlocks = nextBlocks;
         this.nextBlocksAnimation = nextBlocksAnimation;
 
+        /* level status */
+        this.level = 0;
+        this.levelStatus = [
+            {levelUp:   0, blocks:  6, ojamaRatio: 10, ojamaCount: 6},
+            {levelUp:  30, blocks:  7, ojamaRatio: 10, ojamaCount: 6},
+            {levelUp:  60, blocks:  8, ojamaRatio:  8, ojamaCount: 6},
+            {levelUp:  90, blocks:  9, ojamaRatio:  8, ojamaCount: 5},
+            {levelUp: 120, blocks: 10, ojamaRatio:  7, ojamaCount: 5},
+        ];
+
         /* other status */
         this.pushUpCounter = 0; // 消さずに押し上げた回数のカウント
+        this.pushUplimit = 6; // お邪魔ペナルティまでの猶予
         this.combo = 0; // コンボ
         this.comboFlag = false; // コンボ持続状態の管理(false時に消せなかった場合、コンボが途切れる)
         this.score = 0; // 現在のスコア
         this.addScore = 0; // ブロック消去により加算されるスコア
         this.goToTitle = false; // ゲームオーバーの時、タイトルに戻る操作が有効かどうか管理するフラグ
+        this.timeCount = 0;
+        this.totalEraseCount = 0; // トータルで消したブロックの個数
 
         /* labels */
         // combo label
@@ -215,7 +230,7 @@ phina.define('Main', {
         // additional score label
         this.addScoreLabel = Label({
             text: '',
-            fontsize: 32,
+            fontSize: 32,
             fill: 'white',
             fontFamily: "'Courier New'"
         }).addChildTo(this);
@@ -225,12 +240,42 @@ phina.define('Main', {
         this.howToLabel = Label({
             text: '[A][D] = move\n   [S] = swap\n   [W] = push',
             align: 'left',
-            fontsize: 24,
+            fontSize: 24,
             fill: 'white',
             fontFamily: "'Courier New'"
         }).addChildTo(this);
         this.howToLabel.origin.set(1,0);
         this.howToLabel.setPosition(840, 380);
+        // pushUpCounter label
+        this.pushUpCounterLabel = Label({
+            text: '' + this.pushUplimit,
+            fontSize: 64,
+            fill: 'white',
+            stroke: 'red',
+            strokeWidth: 8,
+            fontFamily: "'Courier New'"
+        }).addChildTo(this);
+        this.pushUpCounterLabel.origin.set(0.5, 0.5);
+        this.pushUpCounterLabel.setPosition(460, 480);
+        this.maxPushUpLabel = Label({
+            text: '/' + this.pushUplimit,
+            fontSize: 32,
+            fill: 'white',
+            stroke: 'red',
+            strokeWidth: 4,
+            fontFamily: "'Courier New'"
+        }).addChildTo(this);
+        this.maxPushUpLabel.origin.set(0.5, 0.5);
+        this.maxPushUpLabel.setPosition(500, 496);
+        // (debug) timecounter
+        this.timeCountLabel = Label({
+            text: '0',
+            fontSize: 16,
+            fill: 'white',
+            fontFamily: "'Courier New'"
+        }).addChildTo(this);
+        this.timeCountLabel.origin.set(0, 0);
+        this.timeCountLabel.setPosition(10, 30);
 
         // 初期配置
         for(let x = 0; x < FIELD_WIDTH; x++){
@@ -238,13 +283,38 @@ phina.define('Main', {
             this.fieldMap[x][FIELD_HEIGHT - 1] = this.blockOrder[x];
         }
         this.fieldUpdate();
-
     },
-
+    //---------------------------------------------------------------------------
+    // ready -> go! アニメーション
+    ready: function(){
+        let readyGoLabel = Label({
+            text: 'READY?',
+            fontSize: 64,
+            fill: 'white',
+            stroke: 'blue',
+            strokeWidth: 8,
+            fontFamily: "'Courier New'"
+        }).addChildTo(this);
+        readyGoLabel.origin.set(0.5, 0.5);
+        readyGoLabel.setPosition(FIELD_X + FIELD_WIDTH * BLOCK_SIZE / 2 - BLOCK_SIZE / 2, 200);
+        readyGoLabel.alpha = 0.0;
+        readyGoLabel.tweener.to({alpha: 1.0}, 200)
+                            .wait(1000)
+                            .to({scaleX: 0.0}, 80, 'easeInCubic')
+                            .set({text: ' GO! '})
+                            .to({scaleX: 1.0}, 80, 'easeInCubic')
+                            .wait(300)
+                            .to({y: -100}, 300, 'easeInBack')
+                            .call(() => {
+                                this.acceptKeyInput = true;
+                                return;
+                            })
+                            .play();
+    },
+    //---------------------------------------------------------------------------
     // 押し上げる
     pushToField: function(){
         console.log('push to field');
-        this.pushUpCounter++;
         for(let y = 0; y < FIELD_HEIGHT; y++){
             if (y < FIELD_HEIGHT - 1){
                 this.fieldMap[this.pushBlocksX    ][y] = this.fieldMap[this.pushBlocksX    ][y + 1];
@@ -261,11 +331,18 @@ phina.define('Main', {
         this.pushBlocks[1].tweener.moveBy(0, -BLOCK_SIZE - DISTANCE_FROM_FB_TO_PB, 100)
                                   .set({alpha: 0.0})
                                   .play();
+        // お邪魔カウンターのインクリメントとアニメーション
+        this.pushUpCounter++;
+        this.pushUpCounterLabel.moveTo(460, 460);
+        this.pushUpCounterLabel.tweener.to({y: 480}, 100, 'easeInCubic').play();
+        this.pushUpCounterLabel.text = '' + (this.pushUplimit - this.pushUpCounter);
+        // 一定時間待機後フィールド更新へ
         this.dummyGroup.tweener.wait(100).call(() => {this.fieldUpdate()}).play();
     },
-
+    //---------------------------------------------------------------------------
     // お邪魔を1列生成して押し上げ
     pushOjamaToField: function(){
+        SoundManager.setVolume(0.4);
         SoundManager.play('ojama');
         console.log('push Ojama to field');
         var ojamaBlocks = new Array(FIELD_WIDTH);
@@ -285,15 +362,20 @@ phina.define('Main', {
                                   .set({alpha: 0.0})
                                   .play();
         }
+        // お邪魔カウンターのアニメーション
+        this.pushUpCounterLabel.tweener.set({rotation: 0}).to({rotation: 360}, 300, 'easeOutCubic').play();
+        this.pushUpCounterLabel.text = '' + (this.pushUplimit - this.pushUpCounter);
+        // 一定時間待機後フィールド更新へ
         this.dummyGroup.tweener.wait(200).call(() => {this.fieldUpdate()}).play();
     },
-
+    //---------------------------------------------------------------------------
     // 消えるブロックを探す
     checkErase: function(){
         var matchFlag = 0;
         var isMatch = new Array(4); // [left, up, right, down]
         var setErase = new Array(FIELD_WIDTH);
         var direction = [-1, 0, 1, 0];
+        var comboBairitsu = 0; // コンボボーナスの倍率
         console.log(this.fieldMap);
 
         for(let i = 0; i < FIELD_WIDTH; i++){
@@ -336,6 +418,8 @@ phina.define('Main', {
             for(let y = 0; y < FIELD_HEIGHT; y++){
                 // culculate additional score
                 this.addScore += ((this.fieldMap[x][y] != OJAMA_ID) && setErase[x][y]) * 10;
+                // add total erase count
+                this.totalEraseCount += ((this.fieldMap[x][y] != OJAMA_ID) && setErase[x][y]);
                 // search ojama which is erased
                 if(this.fieldMap[x][y] == OJAMA_ID){
                     for(let d = 0; d < 4; d++){
@@ -354,8 +438,12 @@ phina.define('Main', {
             this.addScoreLabel.text = this.addScoreLabel.text + bairitsu + ' x';
         }
         // コンボボーナス（最大7）
-        this.addScore *= (this.combo > 7 ? 7 : this.combo);
-        this.addScoreLabel.text += (this.combo > 7 ? 7 : this.combo);
+        comboBairitsu = 0;
+        for (let i = 1; i <= (this.combo > 4 ? 4 : this.combo); i++){
+            comboBairitsu += i;
+        }
+        this.addScore *= comboBairitsu;
+        this.addScoreLabel.text += comboBairitsu;
         this.score += this.addScore;
 
         console.log(setErase);
@@ -367,12 +455,14 @@ phina.define('Main', {
             this.isGameOver();
         }
     },
+    //---------------------------------------------------------------------------
     // 消去・ブロック落下
     erase: function(){
         this.pushUpCounter = 0;
         this.comboFlag = true;
         var fall;
         var animateTime_1 = 300, animateTime_2 = 500, animateTime_3 = 300;
+        SoundManager.setVolume(1.0);
         SoundManager.play('erase');
         // 各スプライトの移動を制御
         for(let x = 0; x < FIELD_WIDTH; x++){
@@ -389,7 +479,7 @@ phina.define('Main', {
                     else{ // Ojama
                         this.fieldBlocks[x][y].tweener.wait(animateTime_1)
                                                       .to({alpha: 0}, animateTime_2)
-                                                      .play()
+                                                      .play();
                     }
                 }
                 // 落下アニメーション
@@ -425,11 +515,31 @@ phina.define('Main', {
                                   .play();
         // update score
         this.scoreLabel.text = 'Score: ' + ( '00000000' + this.score ).slice(-8);
+        // update pushUpCounter display
+        this.pushUpCounterLabel.text = '' + (this.pushUplimit - this.pushUpCounter);
+        this.pushUpCounterLabel.tweener.to({scaleX: 0.8, scaleY: 0.8}, 100)
+                                       .to({scaleX: 1.0, scaleY: 1.0}, 100)
+                                       .play();
+        // totalEraseCount が一定値を超えたとき　レベルアップ
+        if (this.level < LEVEL_MAX){
+            if (this.totalEraseCount >= this.levelStatus[this.level + 1].levelUp){
+                this.level++;
+                // 押し上げ限界値に変更があった場合アニメーションしつつ更新
+                if (this.pushUplimit != this.levelStatus[this.level].ojamaCount){
+                    this.pushUplimit = this.levelStatus[this.level].ojamaCount;
+                    this.maxPushUpLabel.text = '/' + this.pushUplimit;
+                    this.maxPushUpLabel.tweener.to({scaleX: 1.5, scaleY: 1.5}, 100)
+                                               .to({scaleX: 1.0, scaleY: 1.0}, 100)
+                                               .play();
+                }
+            }
+        }
         // wait -> goto fieldUpdate
         this.dummyGroup.tweener.wait(animateTime_1 + animateTime_2 + animateTime_3 + 100)
                                .call(() => {this.fieldUpdate(0);})
                                .play();
     },
+    //---------------------------------------------------------------------------
     // 盤面更新
     fieldUpdate: function(initFlag){
         console.log('Start Updating...');
@@ -449,6 +559,7 @@ phina.define('Main', {
         }
         this.checkErase();
     },
+    //---------------------------------------------------------------------------
     // ゲームオーバー判定
     isGameOver: function(){
         console.log('game over?');
@@ -470,6 +581,7 @@ phina.define('Main', {
                 fill: 'white',
                 fontFamily: "'Courier New'"
             }).addChildTo(this).setPosition(FIELD_X + BLOCK_SIZE * FIELD_WIDTH / 2 - BLOCK_SIZE / 2, FIELD_Y + BLOCK_SIZE * FIELD_HEIGHT / 2 + 64);
+            SoundManager.setVolume(1.0);
             SoundManager.play('gameOver');
             gameOverLabel.alpha = 0.0;
             pressSpaceKeyLabel.alpha = 0.0;
@@ -494,7 +606,7 @@ phina.define('Main', {
         }
         else{
             this.comboFlag = false;
-            if(this.pushUpCounter > 4){
+            if(this.pushUpCounter >= this.pushUplimit){
                 this.pushUpCounter = 0;
                 this.pushOjamaToField(); // if push up with no erase 5 times, put ojama
             }
@@ -509,28 +621,40 @@ phina.define('Main', {
                         this.nextMap[i][j] = this.nextMap[i + 1][j];
                         this.nextBlocksAnimation[i][j].gotoAndPlay('block_' + this.nextMap[i][j]);
                     }
-                    this.nextMap[VISIBLE_NEXT - 1][j] = this.blockOrder[Random.randint(0, 7)];
-                    if(!Random.randint(0, 10)) this.nextMap[VISIBLE_NEXT - 1][j] = OJAMA_ID;
+                    this.nextMap[VISIBLE_NEXT - 1][j] = this.blockOrder[Random.randint(0, this.levelStatus[this.level].blocks - 1)]; // new block
+                    if(!Random.randint(0, this.levelStatus[this.level].ojamaRatio)) this.nextMap[VISIBLE_NEXT - 1][j] = OJAMA_ID;
                     this.nextBlocksAnimation[VISIBLE_NEXT - 1][j].gotoAndPlay('block_' + this.nextMap[VISIBLE_NEXT - 1][j]);
                 }
-                this.acceptKeyInput = true;
-                return;
+                // if first update: goto ready animation
+                if (this.firstFieldUpdate){
+                    this.firstFieldUpdate = false;
+                    this.ready();
+                }
+                else{
+                    this.acceptKeyInput = true;
+                    return;
+                }
             }
         }
     },
+    //---------------------------------------------------------------------------
     // 毎フレーム呼び出し
     update: function(app){
         var key = app.keyboard;
         var tmp;
+        this.timeCount++;
+        this.timeCountLabel.text = 'time:' + Math.floor(this.timeCount / 30);
         if(this.acceptKeyInput == true){
             // push
             if(key.getKeyDown('W')){
+                SoundManager.setVolume(0.3);
                 SoundManager.play('push');
                 this.acceptKeyInput = false;
                 this.pushToField();
             }
             // move to left
             if(key.getKeyDown('A') && this.pushBlocksX > 0){
+                SoundManager.setVolume(0.3);
                 SoundManager.play('moveAndSwap');
                 // refuse key input for 0.1 sec.
                 this.dummyGroup.tweener.call(() => {this.acceptKeyInput = false})
@@ -544,6 +668,7 @@ phina.define('Main', {
             }
             // move to right
             if(key.getKeyDown('D') && this.pushBlocksX < FIELD_WIDTH - 2){
+                SoundManager.setVolume(0.3);
                 SoundManager.play('moveAndSwap');
                 // refuse key input for 0.1 sec.
                 this.dummyGroup.tweener.call(() => {this.acceptKeyInput = false})
@@ -557,6 +682,7 @@ phina.define('Main', {
             }
             // swap
             if(key.getKeyDown('S')){
+                SoundManager.setVolume(0.3);
                 SoundManager.play('moveAndSwap');
                 // refuse key input for 0.1 sec.
                 this.dummyGroup.tweener.call(() => {this.acceptKeyInput = false})
@@ -616,7 +742,9 @@ phina.main(function(){
         width: SCREEN_WIDTH,
         height: SCREEN_HEIGHT,
         fit: true,
-        scenes: MYSCENES
+        scenes: MYSCENES,
+        fps: 60
     });
+    app.enableStats();
     app.run();
 })

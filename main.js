@@ -28,10 +28,13 @@ const ASSETS = {
     image:{
         'block': 'img/block.png',
         'field': 'img/field.png',
-        'background': 'img/background.png'
+        'background': 'img/background_1.png',
+        'howto': 'img/howto.png',
+        'displayBox': 'img/displaybox.png'
     },
     spritesheet:{
         'block_ss': 'block_ss.json',
+        'displayBox_ss': 'displayBox_ss.json'
     },
     sound:{
         'moveAndSwap': 'se/enemyshot_trim.mov',
@@ -48,16 +51,18 @@ const BLOCK_SIZE = 48;
 const EMPTY_ID = -1;
 const OJAMA_ID = 10;
 
-const FIELD_X = 120;
-const FIELD_Y = 16;
+const FIELD_X = 100;
+const FIELD_Y = 8;
 const FIELD_WIDTH = 6;
 const FIELD_HEIGHT = 11;
-const DISTANCE_FROM_FB_TO_PB = 16; // distance from bottom of field to push blocks
+const DISTANCE_FROM_FB_TO_PB = 24; // distance from bottom of field to push blocks
 const PUSHBLOCKS_Y = FIELD_Y + FIELD_HEIGHT * BLOCK_SIZE + DISTANCE_FROM_FB_TO_PB;
 const DISTANCE_BETWEEN_NEXTBLOCKS = 48;
 const NEXTBLOCKS_X = FIELD_X + FIELD_WIDTH * BLOCK_SIZE + DISTANCE_BETWEEN_NEXTBLOCKS;
 const VISIBLE_NEXT = 4;
-const LEVEL_MAX = 4;
+const LEVEL_MAX = 6;
+const SCORELABEL_RIGHT = 800;
+
 
 phina.define('Title', {
     superClass: 'DisplayScene',
@@ -66,8 +71,12 @@ phina.define('Title', {
             width: SCREEN_WIDTH,
             height: SCREEN_HEIGHT
         });
+        this.mode = 'FREE';
         this.backgroundColor = 'black';
+        this.acceptKeyInput = true;
+        this.group = DisplayElement().addChildTo(this).setPosition(0, SCREEN_HEIGHT);
         // title label
+        this.backGroundPaper = Sprite('background').addChildTo(this.group).setPosition(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
         this.titleLabel = Label({
             text: 'Oshiage Puzzle',
             fontSize: 64,
@@ -75,9 +84,10 @@ phina.define('Title', {
             stroke: 'blue',
             strokeWidth: 8,
             fontFamily: "'Courier New'"
-        }).addChildTo(this);
+        }).addChildTo(this.group);
         this.titleLabel.origin.set(0.5, 0.5);
-        this.titleLabel.setPosition(480, 200);
+        this.titleLabel.setPosition(480, 180);
+        /*
         // press label
         this.pressLabel = Label({
             text: 'Press space key to start',
@@ -88,10 +98,88 @@ phina.define('Title', {
         }).addChildTo(this);
         this.pressLabel.origin.set(0.5, 0.5);
         this.pressLabel.setPosition(480, 400);
+        */
+        // select
+        this.rectangle = RectangleShape({
+            width: 600,
+            height: 96,
+            fill: 'indigo',
+            strokeWidth: 8,
+            stroke: 'mediumpurple',
+            cornerRadius: 10,
+        }).addChildTo(this.group);
+        this.rectangle.setPosition(480, 340);
+        this.rectangle.alpha = 0.75;
+        // mode label
+        this.freePlayLabel = Label({
+            padding: 16,
+            text: 'free play       ',
+            fontSize: 48,
+            fill: 'white',
+            strokeWidth: 8,
+            fontFamily: "'Courier New'"
+        }).addChildTo(this.group);
+        this.freePlayLabel.origin.set(0.5, 0.5);
+        this.freePlayLabel.setPosition(480, 340);
+        this.timeChallengeLabel = Label({
+            padding: 16,
+            text: '90sec Challenge ',
+            fontSize: 48,
+            fill: 'white',
+            strokeWidth: 8,
+            fontFamily: "'Courier New'"
+        }).addChildTo(this.group);
+        this.timeChallengeLabel.origin.set(0.5, 0.5);
+        this.timeChallengeLabel.setPosition(480, 460);
+
+        this.group.tweener.to({y: 0}, 400, 'easeOutBack').play();
     },
     update: function(app){
         var key = app.keyboard;
-        if (key.getKeyDown('space')) this.exit();
+        if (this.acceptKeyInput){
+            if (key.getKeyDown('space')) {
+                SoundManager.setVolume(0.3);
+                SoundManager.play('push');
+                this.acceptKeyInput = false;
+                this.rectangle.tweener.set({alpha: 0.0})
+                                      .wait(80)
+                                      .set({alpha: 0.75})
+                                      .wait(80)
+                                      .set({alpha: 0.0})
+                                      .wait(80)
+                                      .set({alpha: 0.75})
+                                      .wait(80)
+                                      .play();
+                this.titleLabel.tweener.wait(400)
+                                       .call(() => {
+                                           this.group.tweener.by({y: -SCREEN_HEIGHT}, 400, 'easeInBack').play();
+                                       })
+                                       .wait(400)
+                                       .call(() =>{
+                                           this.exit({gameMode: this.mode});
+                                       })
+                                       .play();
+            }
+            else if (key.getKeyDown('w') ^ key.getKeyDown('s')){
+                SoundManager.setVolume(0.3);
+                SoundManager.play('moveAndSwap');
+                this.mode = (this.mode === 'FREE') ? 'TIME' : 'FREE';
+                if (this.mode === 'FREE'){
+                    this.rectangle.tweener.call(() => {this.acceptKeyInput = false;})
+                                          .to({y: 340}, 80, 'easeOutCubic')
+                                          .wait(100)
+                                          .call(() => {this.acceptKeyInput = true;})
+                                          .play();
+                }
+                else if (this.mode === 'TIME'){
+                    this.rectangle.tweener.call(() => {this.acceptKeyInput = false;})
+                                          .to({y: 460}, 80, 'easeOutCubic')
+                                          .wait(100)
+                                          .call(() => {this.acceptKeyInput = true;})
+                                          .play();
+                }
+            }
+        }
     }
 });
 
@@ -103,19 +191,58 @@ phina.define('Main', {
             width: SCREEN_WIDTH,
             height: SCREEN_HEIGHT
         });
+        /* テキストボックス作成 */
+        let displayBox = function(p, width, height){
+            var displayElem = DisplayElement().addChildTo(p);
+            var pieces = new Array(width);
+            var piecesAnimation = new Array(width);
+            var ssName;
+            for (let i = 0; i < width; i++){
+                pieces[i] = new Array(height);
+                piecesAnimation[i] = new Array(height);
+            }
+            for (let j = 0; j < height; j++){
+                for (let i = 0; i < width; i++){
+                    if (i === 0){
+                        if (j === 0)               ssName = 'leftTop';
+                        else if (j === height - 1) ssName = 'leftBottom';
+                        else                       ssName = 'left';
+                    }
+                    else if (i === width - 1){
+                        if (j === 0)               ssName = 'rightTop';
+                        else if (j === height - 1) ssName = 'rightBottom';
+                        else                       ssName = 'right';
+                    }
+                    else{
+                        if (j === 0)               ssName = 'top';
+                        else if (j === height - 1) ssName = 'bottom';
+                        else                       ssName = 'center';
+                    }
+
+                    pieces[i][j] = Sprite('displayBox', 16, 16).addChildTo(displayElem)
+                                                       .setPosition((- width / 2 + i) * 16, (- height / 2 + j) * 16);
+                    piecesAnimation[i][j] = FrameAnimation('displayBox_ss').attachTo(pieces[i][j]);
+                    piecesAnimation[i][j].gotoAndPlay(ssName);
+                }
+            }
+            return displayElem;
+        }
+
         this.backgroundColor = 'black';
+        this.dummyGroup = DisplayElement().addChildTo(this).setPosition(0, SCREEN_HEIGHT); // dummy group for waiting
 
-        var backGroundPaper = Sprite('background').addChildTo(this).setPosition(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
 
-        this.dummyGroup = DisplayElement().addChildTo(this); // dummy group for waiting
-        this.puzzleFieldGroup = DisplayElement().addChildTo(this); // dummy group for gameover animation
+
+        var backGroundPaper = Sprite('background').addChildTo(this.dummyGroup).setPosition(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+
         this.acceptKeyInput = false;
         this.firstFieldUpdate = true;
 
         /* Preare puzzle field */
+        this.puzzleFieldGroup = DisplayElement().addChildTo(this.dummyGroup); // dummy group for gameover animation
         var fieldImage = Sprite('field', 320, 512).addChildTo(this.puzzleFieldGroup);
         fieldImage.origin.set(0,0);
-        fieldImage.moveTo(FIELD_X - BLOCK_SIZE/2 - 16, FIELD_Y + 8);
+        fieldImage.moveTo(FIELD_X - BLOCK_SIZE/2 - 16, FIELD_Y + 8); // 注意:クソ実装につき取り扱いは慎重に！
 
         /* shuffle block color */
         var blockOrder = new Array(BLOCK_COLORS);
@@ -151,9 +278,12 @@ phina.define('Main', {
         this.fieldBlocks = fieldBlocks;
         this.fieldBlocksAnimation = fieldBlocksAnimation;
 
+        this.joint = displayBox (this.puzzleFieldGroup, 10, 1).setPosition(400, PUSHBLOCKS_Y + 4);
+        this.pushfieldDisplay = displayBox(this.puzzleFieldGroup, FIELD_WIDTH * 3 + 2,  5).setPosition(FIELD_X + FIELD_WIDTH * 48 / 2 - 16, PUSHBLOCKS_Y + 8);
+        this.nextDisplay = displayBox(this.puzzleFieldGroup, 40, 5).setPosition(724, PUSHBLOCKS_Y + 8);
 
         /* Prepare push blocks */
-        var pushBlocks = [Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this), Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this)];
+        var pushBlocks = [Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this.dummyGroup), Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this.dummyGroup)];
         var pushBlocksAnimation = [FrameAnimation('block_ss').attachTo(pushBlocks[0]), FrameAnimation('block_ss').attachTo(pushBlocks[1])];
         var pushBlocksX = 2;
         var pushMap = [0, 0];
@@ -178,7 +308,7 @@ phina.define('Main', {
             nextBlocksAnimation[i] = new Array(2);
             for(let j = 0; j < 2; j++){
                 nextMap[i][j] = this.blockOrder[Random.randint(0, 5)];
-                nextBlocks[i][j] = Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this);
+                nextBlocks[i][j] = Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this.puzzleFieldGroup);
                 nextBlocksAnimation[i][j] = FrameAnimation('block_ss').attachTo(nextBlocks[i][j]).gotoAndPlay('block_' + nextMap[i][j]);
                 nextBlocks[i][j].moveTo(NEXTBLOCKS_X + 128 * i + BLOCK_SIZE * j, PUSHBLOCKS_Y);
             }
@@ -190,23 +320,35 @@ phina.define('Main', {
         /* level status */
         this.level = 0;
         this.levelStatus = [
-            {levelUp:   0, blocks:  6, ojamaRatio: 10, ojamaCount: 6},
-            {levelUp:  30, blocks:  7, ojamaRatio: 10, ojamaCount: 6},
-            {levelUp:  60, blocks:  8, ojamaRatio:  8, ojamaCount: 6},
-            {levelUp:  90, blocks:  9, ojamaRatio:  8, ojamaCount: 5},
-            {levelUp: 120, blocks: 10, ojamaRatio:  7, ojamaCount: 5},
+            {levelUp:   0, blocks:  6, ojamaRatio: 10, ojamaCount: 7},
+            {levelUp:  30, blocks:  6, ojamaRatio:  8, ojamaCount: 6},
+            {levelUp:  60, blocks:  7, ojamaRatio: 10, ojamaCount: 5},
+            {levelUp:  90, blocks:  7, ojamaRatio:  8, ojamaCount: 5},
+            {levelUp: 120, blocks:  8, ojamaRatio:  8, ojamaCount: 5},
+            {levelUp: 150, blocks:  9, ojamaRatio:  8, ojamaCount: 5},
+            {levelUp: 180, blocks: 10, ojamaRatio:  8, ojamaCount: 5},
         ];
 
         /* other status */
         this.pushUpCounter = 0; // 消さずに押し上げた回数のカウント
-        this.pushUplimit = 6; // お邪魔ペナルティまでの猶予
+        this.pushUplimit = this.levelStatus[this.level].ojamaCount; // お邪魔ペナルティまでの猶予
         this.combo = 0; // コンボ
         this.comboFlag = false; // コンボ持続状態の管理(false時に消せなかった場合、コンボが途切れる)
         this.score = 0; // 現在のスコア
         this.addScore = 0; // ブロック消去により加算されるスコア
         this.goToTitle = false; // ゲームオーバーの時、タイトルに戻る操作が有効かどうか管理するフラグ
         this.timeCount = 0;
+        this.timeCountFlag = false;
         this.totalEraseCount = 0; // トータルで消したブロックの個数
+
+        /* score display flame */
+        this.scoreDisplay  = displayBox(this.dummyGroup, 26, 10).setPosition(656, 128);
+        this.levelDisplay  = displayBox(this.dummyGroup, 10,  8).setPosition(490, 340);
+        this.pushUpDisplay = displayBox(this.dummyGroup, 10,  8).setPosition(490, 460);
+
+        /* how to move block */
+        var howto = Sprite('howto').addChildTo(this.dummyGroup);
+        howto.moveTo(760, 400);
 
         /* labels */
         // combo label
@@ -215,27 +357,28 @@ phina.define('Main', {
             fontSize: 32,
             fill: 'yellow',
             fontFamily: "'Courier New'"
-        }).addChildTo(this);
-        this.comboLabel.origin.set(1, 0);
-        this.comboLabel.setPosition(840, 160);
+        }).addChildTo(this.dummyGroup);
+        this.comboLabel.origin.set(1, 0.5);
+        this.comboLabel.setPosition(SCORELABEL_RIGHT, 160);
         // score label
         this.scoreLabel = Label({
             text: 'Score: ' + ( '00000000' + this.score ).slice(-8),
             fontSize: 32,
             fill: 'white',
             fontFamily: "'Courier New'"
-        }).addChildTo(this);
-        this.scoreLabel.origin.set(1, 0);
-        this.scoreLabel.setPosition(840, 120);
+        }).addChildTo(this.dummyGroup);
+        this.scoreLabel.origin.set(1, 0.5);
+        this.scoreLabel.setPosition(SCORELABEL_RIGHT, 120);
         // additional score label
         this.addScoreLabel = Label({
             text: '',
             fontSize: 32,
             fill: 'white',
             fontFamily: "'Courier New'"
-        }).addChildTo(this);
-        this.addScoreLabel.origin.set(1, 0);
+        }).addChildTo(this.dummyGroup);
+        this.addScoreLabel.origin.set(1, 0.5);
         this.addScoreLabel.setPosition(-255, -255);
+        /*
         // howto label
         this.howToLabel = Label({
             text: '[A][D] = move\n   [S] = swap\n   [W] = push',
@@ -243,9 +386,10 @@ phina.define('Main', {
             fontSize: 24,
             fill: 'white',
             fontFamily: "'Courier New'"
-        }).addChildTo(this);
-        this.howToLabel.origin.set(1,0);
-        this.howToLabel.setPosition(840, 380);
+        }).addChildTo(this.dummyGroup);
+        this.howToLabel.origin.set(1, 0.5);
+        this.howToLabel.setPosition(840, 360);
+        */
         // pushUpCounter label
         this.pushUpCounterLabel = Label({
             text: '' + this.pushUplimit,
@@ -254,9 +398,9 @@ phina.define('Main', {
             stroke: 'red',
             strokeWidth: 8,
             fontFamily: "'Courier New'"
-        }).addChildTo(this);
+        }).addChildTo(this.dummyGroup);
         this.pushUpCounterLabel.origin.set(0.5, 0.5);
-        this.pushUpCounterLabel.setPosition(460, 480);
+        this.pushUpCounterLabel.setPosition(460, 460);
         this.maxPushUpLabel = Label({
             text: '/' + this.pushUplimit,
             fontSize: 32,
@@ -264,24 +408,28 @@ phina.define('Main', {
             stroke: 'red',
             strokeWidth: 4,
             fontFamily: "'Courier New'"
-        }).addChildTo(this);
+        }).addChildTo(this.dummyGroup);
         this.maxPushUpLabel.origin.set(0.5, 0.5);
-        this.maxPushUpLabel.setPosition(500, 496);
+        this.maxPushUpLabel.setPosition(500, 476);
         // (debug) timecounter
         this.timeCountLabel = Label({
             text: '0',
             fontSize: 16,
             fill: 'white',
             fontFamily: "'Courier New'"
-        }).addChildTo(this);
+        }).addChildTo(this.dummyGroup);
         this.timeCountLabel.origin.set(0, 0);
         this.timeCountLabel.setPosition(10, 30);
+        this.timeCountLabel.alpha = 0.0;
+
 
         // 初期配置
         for(let x = 0; x < FIELD_WIDTH; x++){
             this.fieldMap[x].fill(EMPTY_ID);
             this.fieldMap[x][FIELD_HEIGHT - 1] = this.blockOrder[x];
         }
+
+        this.dummyGroup.tweener.to({y: 0}, 400, 'easeOutBack').play();
         this.fieldUpdate();
     },
     //---------------------------------------------------------------------------
@@ -294,7 +442,7 @@ phina.define('Main', {
             stroke: 'blue',
             strokeWidth: 8,
             fontFamily: "'Courier New'"
-        }).addChildTo(this);
+        }).addChildTo(this.dummyGroup);
         readyGoLabel.origin.set(0.5, 0.5);
         readyGoLabel.setPosition(FIELD_X + FIELD_WIDTH * BLOCK_SIZE / 2 - BLOCK_SIZE / 2, 200);
         readyGoLabel.alpha = 0.0;
@@ -306,6 +454,7 @@ phina.define('Main', {
                             .wait(300)
                             .to({y: -100}, 300, 'easeInBack')
                             .call(() => {
+                                this.timeCountFlag = true;
                                 this.acceptKeyInput = true;
                                 return;
                             })
@@ -320,24 +469,24 @@ phina.define('Main', {
                 this.fieldMap[this.pushBlocksX    ][y] = this.fieldMap[this.pushBlocksX    ][y + 1];
                 this.fieldMap[this.pushBlocksX + 1][y] = this.fieldMap[this.pushBlocksX + 1][y + 1];
             }
-            this.fieldBlocks[this.pushBlocksX    ][y].tweener.moveBy(0, -BLOCK_SIZE, 100).play();
-            this.fieldBlocks[this.pushBlocksX + 1][y].tweener.moveBy(0, -BLOCK_SIZE, 100).play();
+            this.fieldBlocks[this.pushBlocksX    ][y].tweener.wait(20).by({y:-BLOCK_SIZE}, 100, 'easeOutBack').play();
+            this.fieldBlocks[this.pushBlocksX + 1][y].tweener.wait(20).by({y:-BLOCK_SIZE}, 100, 'easeOutBack').play();
         }
         this.fieldMap[this.pushBlocksX    ][FIELD_HEIGHT - 1] = this.pushMap[0];
         this.fieldMap[this.pushBlocksX + 1][FIELD_HEIGHT - 1] = this.pushMap[1];
-        this.pushBlocks[0].tweener.moveBy(0, -BLOCK_SIZE - DISTANCE_FROM_FB_TO_PB, 100)
+        this.pushBlocks[0].tweener.moveBy(0, -BLOCK_SIZE - DISTANCE_FROM_FB_TO_PB, 150)
                                   .set({alpha: 0.0})
                                   .play();
-        this.pushBlocks[1].tweener.moveBy(0, -BLOCK_SIZE - DISTANCE_FROM_FB_TO_PB, 100)
+        this.pushBlocks[1].tweener.moveBy(0, -BLOCK_SIZE - DISTANCE_FROM_FB_TO_PB, 150)
                                   .set({alpha: 0.0})
                                   .play();
         // お邪魔カウンターのインクリメントとアニメーション
         this.pushUpCounter++;
-        this.pushUpCounterLabel.moveTo(460, 460);
-        this.pushUpCounterLabel.tweener.to({y: 480}, 100, 'easeInCubic').play();
+        this.pushUpCounterLabel.moveTo(460, 440);
+        this.pushUpCounterLabel.tweener.to({y: 460}, 150, 'easeInCubic').play();
         this.pushUpCounterLabel.text = '' + (this.pushUplimit - this.pushUpCounter);
         // 一定時間待機後フィールド更新へ
-        this.dummyGroup.tweener.wait(100).call(() => {this.fieldUpdate()}).play();
+        this.dummyGroup.tweener.wait(150).call(() => {this.fieldUpdate()}).play();
     },
     //---------------------------------------------------------------------------
     // お邪魔を1列生成して押し上げ
@@ -507,7 +656,7 @@ phina.define('Main', {
         }
         console.log(this.fieldMap);
         // additional score animation
-        this.addScoreLabel.moveTo(840, 100);
+        this.addScoreLabel.moveTo(SCORELABEL_RIGHT, 100);
         this.addScoreLabel.tweener.set({alpha: 0.0})
                                   .by({y: -16, alpha: 1.0}, 100)
                                   .wait(animateTime_1 + animateTime_2)
@@ -528,6 +677,8 @@ phina.define('Main', {
                 if (this.pushUplimit != this.levelStatus[this.level].ojamaCount){
                     this.pushUplimit = this.levelStatus[this.level].ojamaCount;
                     this.maxPushUpLabel.text = '/' + this.pushUplimit;
+
+                    this.pushUpCounterLabel.text = '' + (this.pushUplimit - this.pushUpCounter);
                     this.maxPushUpLabel.tweener.to({scaleX: 1.5, scaleY: 1.5}, 100)
                                                .to({scaleX: 1.0, scaleY: 1.0}, 100)
                                                .play();
@@ -568,19 +719,21 @@ phina.define('Main', {
             gameOver |= (this.fieldMap[i][0] != EMPTY_ID);
         }
         if(gameOver){
-            let self = this;
+            this.timeCountFlag = false;
             let gameOverLabel = Label({
                 text: 'GAME OVER',
                 fontSize: 48,
-                fill: 'tomato',
+                fill: 'white',
+                stroke: 'tomato',
+                strokeWidth: 4,
                 fontFamily: "'Courier New'"
-            }).addChildTo(this).setPosition(FIELD_X + BLOCK_SIZE * FIELD_WIDTH / 2 - BLOCK_SIZE / 2, FIELD_Y + BLOCK_SIZE * FIELD_HEIGHT / 2);
+            }).addChildTo(this.dummyGroup).setPosition(FIELD_X + BLOCK_SIZE * FIELD_WIDTH / 2 - BLOCK_SIZE / 2, FIELD_Y + BLOCK_SIZE * FIELD_HEIGHT / 2);
             let pressSpaceKeyLabel = Label({
                 text: 'Press space key',
                 fontSize: 24,
                 fill: 'white',
                 fontFamily: "'Courier New'"
-            }).addChildTo(this).setPosition(FIELD_X + BLOCK_SIZE * FIELD_WIDTH / 2 - BLOCK_SIZE / 2, FIELD_Y + BLOCK_SIZE * FIELD_HEIGHT / 2 + 64);
+            }).addChildTo(this.dummyGroup).setPosition(FIELD_X + BLOCK_SIZE * FIELD_WIDTH / 2 - BLOCK_SIZE / 2, FIELD_Y + BLOCK_SIZE * FIELD_HEIGHT / 2 + 64);
             SoundManager.setVolume(1.0);
             SoundManager.play('gameOver');
             gameOverLabel.alpha = 0.0;
@@ -599,6 +752,7 @@ phina.define('Main', {
                                          .wait(2000)
                                          .call(() => {
                                              pressSpaceKeyLabel.tweener.by({alpha: 1.0}, 300).play();
+                                             this.puzzleFieldGroup.remove();
                                              this.goToTitle = true;
                                          })
                                          .play();
@@ -642,9 +796,11 @@ phina.define('Main', {
     update: function(app){
         var key = app.keyboard;
         var tmp;
-        this.timeCount++;
-        this.timeCountLabel.text = 'time:' + Math.floor(this.timeCount / 30);
-        if(this.acceptKeyInput == true){
+        if (this.timeCountFlag){
+            this.timeCount += app.deltaTime;
+        }
+        this.timeCountLabel.text = 'time[s]:' + this.timeCount / 1000;
+        if(this.acceptKeyInput === true){
             // push
             if(key.getKeyDown('W')){
                 SoundManager.setVolume(0.3);
@@ -710,7 +866,14 @@ phina.define('Main', {
             // if(key.getKeyDown('space')) this.exit();
         }
         if(this.goToTitle){
-            if(key.getKeyDown('space')) this.exit();
+            if (key.getKeyDown('space')){
+                this.dummyGroup.tweener.by({y: -SCREEN_HEIGHT}, 400, 'easeInBack')
+                                       .call(() =>{
+                                           this.dummyGroup.remove();
+                                           this.exit();
+                                       })
+                                       .play();
+            }
         }
     }
 });
@@ -729,11 +892,6 @@ phina.define('Result', {
         if (key.getKeyDown('space')) this.exit();
     }
 });
-
-
-
-
-
 
 phina.main(function(){
     var app = GameApp({

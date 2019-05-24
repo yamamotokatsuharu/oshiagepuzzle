@@ -1,0 +1,55 @@
+{
+  "frame":{
+    "width":  16,
+    "height": 16,
+    "cols": 3,
+    "rows": 3
+  },
+  "animations":{
+    "leftTop":{
+      "frames":[0],
+      "next": "leftTop",
+      "frequency": 4
+    },
+    "top":{
+      "frames":[1],
+      "next": "top",
+      "frequency": 4
+    },
+    "rightTop":{
+      "frames":[2],
+      "next": "rightTop",
+      "frequency": 4
+    },
+    "left":{
+      "frames":[3],
+      "next": "left",
+      "frequency": 4
+    },
+    "center":{
+      "frames":[4],
+      "next": "center",
+      "frequency": 4
+    },
+    "right":{
+      "frames":[5],
+      "next": "right",
+      "frequency": 4
+    },
+    "leftBottom":{
+      "frames":[6],
+      "next": "leftBottom",
+      "frequency": 4
+    },
+    "bottom":{
+      "frames":[7],
+      "next": "bottom",
+      "frequency": 4
+    },
+    "rightBottom":{
+      "frames":[8],
+      "next": "rightBottom",
+      "frequency": 4
+    }
+  }
+}

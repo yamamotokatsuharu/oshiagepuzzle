@@ -220,7 +220,7 @@ phina.define('Main', {
                     }
 
                     pieces[i][j] = Sprite('displayBox', 16, 16).addChildTo(displayElem)
-                                                       .setPosition((- width / 2 + i) * 16, (- height / 2 + j) * 16);
+                                                       .setPosition((- width / 2 + i + 0.5) * 16, (- height / 2 + j + 0.5) * 16);
                     piecesAnimation[i][j] = FrameAnimation('displayBox_ss').attachTo(pieces[i][j]);
                     piecesAnimation[i][j].gotoAndPlay(ssName);
                 }
@@ -278,9 +278,9 @@ phina.define('Main', {
         this.fieldBlocks = fieldBlocks;
         this.fieldBlocksAnimation = fieldBlocksAnimation;
 
-        this.joint = displayBox (this.puzzleFieldGroup, 10, 1).setPosition(400, PUSHBLOCKS_Y + 4);
-        this.pushfieldDisplay = displayBox(this.puzzleFieldGroup, FIELD_WIDTH * 3 + 2,  5).setPosition(FIELD_X + FIELD_WIDTH * 48 / 2 - 16, PUSHBLOCKS_Y + 8);
-        this.nextDisplay = displayBox(this.puzzleFieldGroup, 40, 5).setPosition(724, PUSHBLOCKS_Y + 8);
+        this.joint = displayBox (this.puzzleFieldGroup, 10, 1).setPosition(400, PUSHBLOCKS_Y - 4);
+        this.pushfieldDisplay = displayBox(this.puzzleFieldGroup, FIELD_WIDTH * 3 + 2,  5).setPosition(FIELD_X + FIELD_WIDTH * 48 / 2 - 24, PUSHBLOCKS_Y);
+        this.nextDisplay = displayBox(this.puzzleFieldGroup, 40, 5).setPosition(716, PUSHBLOCKS_Y);
 
         /* Prepare push blocks */
         var pushBlocks = [Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this.dummyGroup), Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this.dummyGroup)];
@@ -342,9 +342,11 @@ phina.define('Main', {
         this.totalEraseCount = 0; // トータルで消したブロックの個数
 
         /* score display flame */
-        this.scoreDisplay  = displayBox(this.dummyGroup, 26, 10).setPosition(656, 128);
-        this.levelDisplay  = displayBox(this.dummyGroup, 10,  8).setPosition(490, 340);
-        this.pushUpDisplay = displayBox(this.dummyGroup, 10,  8).setPosition(490, 460);
+        this.scoreDisplay     = displayBox(this.dummyGroup, 26, 10).setPosition(656, 120);
+        this.levelDisplay     = displayBox(this.dummyGroup, 10,  8).setPosition(480, 308);
+        this.levelUpDisplay   = displayBox(this.dummyGroup,  5,  4).setPosition(584, 308 + 32);
+        this.pushUpDisplay    = displayBox(this.dummyGroup, 10,  8).setPosition(480, 450);
+        this.maxPushUpDisplay = displayBox(this.dummyGroup,  5,  4).setPosition(584, 450 + 32);
 
         /* how to move block */
         var howto = Sprite('howto').addChildTo(this.dummyGroup);
@@ -390,27 +392,58 @@ phina.define('Main', {
         this.howToLabel.origin.set(1, 0.5);
         this.howToLabel.setPosition(840, 360);
         */
+        // level label
+        this.levelTextLabel = Label({
+            text: 'LEVEL',
+            fontSize: 32,
+            fill: 'orange',
+            //stroke: 'orange',
+            //strokeWidth: 8,
+            fontFamily: "'Courier New'"
+        }).addChildTo(this.dummyGroup);
+        this.levelTextLabel.origin.set(0.5, 0.5);
+        this.levelTextLabel.setPosition(480, 308 - 26);
+        this.levelLabel = Label({
+            text: this.level,
+            fontSize: 64,
+            fill: 'white',
+            stroke: 'orange',
+            strokeWidth: 8,
+            fontFamily: "'Courier New'"
+        }).addChildTo(this.dummyGroup);
+        this.levelLabel.origin.set(0.5, 0.5);
+        this.levelLabel.setPosition(480, 308 + 20);
+
         // pushUpCounter label
+        this.limitTextLabel = Label({
+            text: 'LIMIT',
+            fontSize: 32,
+            fill: 'tomato',
+            fontFamily: "'Courier New'"
+        }).addChildTo(this.dummyGroup);
+        this.limitTextLabel.origin.set(0.5, 0.5);
+        this.limitTextLabel.setPosition(480, 450 - 26);
         this.pushUpCounterLabel = Label({
             text: '' + this.pushUplimit,
             fontSize: 64,
             fill: 'white',
-            stroke: 'red',
+            stroke: 'tomato',
             strokeWidth: 8,
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.pushUpCounterLabel.origin.set(0.5, 0.5);
-        this.pushUpCounterLabel.setPosition(460, 460);
+        this.pushUpCounterLabel.setPosition(480, 450 + 20);
         this.maxPushUpLabel = Label({
             text: '/' + this.pushUplimit,
             fontSize: 32,
             fill: 'white',
-            stroke: 'red',
+            stroke: 'tomato',
             strokeWidth: 4,
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.maxPushUpLabel.origin.set(0.5, 0.5);
-        this.maxPushUpLabel.setPosition(500, 476);
+        this.maxPushUpLabel.setPosition(584, 484);
+
         // (debug) timecounter
         this.timeCountLabel = Label({
             text: '0',
@@ -482,8 +515,8 @@ phina.define('Main', {
                                   .play();
         // お邪魔カウンターのインクリメントとアニメーション
         this.pushUpCounter++;
-        this.pushUpCounterLabel.moveTo(460, 440);
-        this.pushUpCounterLabel.tweener.to({y: 460}, 150, 'easeInCubic').play();
+        this.pushUpCounterLabel.moveBy(0, -20);
+        this.pushUpCounterLabel.tweener.by({y: 20}, 150, 'easeInCubic').play();
         this.pushUpCounterLabel.text = '' + (this.pushUplimit - this.pushUpCounter);
         // 一定時間待機後フィールド更新へ
         this.dummyGroup.tweener.wait(150).call(() => {this.fieldUpdate()}).play();
@@ -673,6 +706,11 @@ phina.define('Main', {
         if (this.level < LEVEL_MAX){
             if (this.totalEraseCount >= this.levelStatus[this.level + 1].levelUp){
                 this.level++;
+                this.levelLabel.text = (this.level != LEVEL_MAX) ? '' + this.level : 'MAX';
+                this.levelLabel.tweener.set({rotation: 0})
+                                       .to({scaleX: 1.5, scaleY: 1.5, rotation: 180}, 100)
+                                       .to({scaleX: 1.0, scaleY: 1.0, rotation: 360}, 100)
+                                       .play();
                 // 押し上げ限界値に変更があった場合アニメーションしつつ更新
                 if (this.pushUplimit != this.levelStatus[this.level].ojamaCount){
                     this.pushUplimit = this.levelStatus[this.level].ojamaCount;
@@ -901,7 +939,7 @@ phina.main(function(){
         height: SCREEN_HEIGHT,
         fit: true,
         scenes: MYSCENES,
-        fps: 60
+        fps: 50
     });
     app.enableStats();
     app.run();

@@ -55,7 +55,7 @@ const FIELD_X = 100;
 const FIELD_Y = 8;
 const FIELD_WIDTH = 6;
 const FIELD_HEIGHT = 11;
-const DISTANCE_FROM_FB_TO_PB = 24; // distance from bottom of field to push blocks
+const DISTANCE_FROM_FB_TO_PB = 16; // distance from bottom of field to push blocks
 const PUSHBLOCKS_Y = FIELD_Y + FIELD_HEIGHT * BLOCK_SIZE + DISTANCE_FROM_FB_TO_PB;
 const DISTANCE_BETWEEN_NEXTBLOCKS = 48;
 const NEXTBLOCKS_X = FIELD_X + FIELD_WIDTH * BLOCK_SIZE + DISTANCE_BETWEEN_NEXTBLOCKS;
@@ -63,6 +63,43 @@ const VISIBLE_NEXT = 4;
 const LEVEL_MAX = 6;
 const SCORELABEL_RIGHT = 800;
 
+
+/* テキストボックス作成 */
+let displayBox = function(p, width, height){
+    var displayElem = DisplayElement().addChildTo(p);
+    var pieces = new Array(width);
+    var piecesAnimation = new Array(width);
+    var ssName;
+    for (let i = 0; i < width; i++){
+        pieces[i] = new Array(height);
+        piecesAnimation[i] = new Array(height);
+    }
+    for (let j = 0; j < height; j++){
+        for (let i = 0; i < width; i++){
+            if (i === 0){
+                if (j === 0)               ssName = 'leftTop';
+                else if (j === height - 1) ssName = 'leftBottom';
+                else                       ssName = 'left';
+            }
+            else if (i === width - 1){
+                if (j === 0)               ssName = 'rightTop';
+                else if (j === height - 1) ssName = 'rightBottom';
+                else                       ssName = 'right';
+            }
+            else{
+                if (j === 0)               ssName = 'top';
+                else if (j === height - 1) ssName = 'bottom';
+                else                       ssName = 'center';
+            }
+
+            pieces[i][j] = Sprite('displayBox', 16, 16).addChildTo(displayElem)
+                                               .setPosition((- width / 2 + i + 0.5) * 16, (- height / 2 + j + 0.5) * 16);
+            piecesAnimation[i][j] = FrameAnimation('displayBox_ss').attachTo(pieces[i][j]);
+            piecesAnimation[i][j].gotoAndPlay(ssName);
+        }
+    }
+    return displayElem;
+}
 
 phina.define('Title', {
     superClass: 'DisplayScene',
@@ -77,6 +114,7 @@ phina.define('Title', {
         this.group = DisplayElement().addChildTo(this).setPosition(0, SCREEN_HEIGHT);
         // title label
         this.backGroundPaper = Sprite('background').addChildTo(this.group).setPosition(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+        this.titleDisplay = displayBox(this.group, 45, 12).setPosition(480,180);
         this.titleLabel = Label({
             text: 'Oshiage Puzzle',
             fontSize: 64,
@@ -191,42 +229,7 @@ phina.define('Main', {
             width: SCREEN_WIDTH,
             height: SCREEN_HEIGHT
         });
-        /* テキストボックス作成 */
-        let displayBox = function(p, width, height){
-            var displayElem = DisplayElement().addChildTo(p);
-            var pieces = new Array(width);
-            var piecesAnimation = new Array(width);
-            var ssName;
-            for (let i = 0; i < width; i++){
-                pieces[i] = new Array(height);
-                piecesAnimation[i] = new Array(height);
-            }
-            for (let j = 0; j < height; j++){
-                for (let i = 0; i < width; i++){
-                    if (i === 0){
-                        if (j === 0)               ssName = 'leftTop';
-                        else if (j === height - 1) ssName = 'leftBottom';
-                        else                       ssName = 'left';
-                    }
-                    else if (i === width - 1){
-                        if (j === 0)               ssName = 'rightTop';
-                        else if (j === height - 1) ssName = 'rightBottom';
-                        else                       ssName = 'right';
-                    }
-                    else{
-                        if (j === 0)               ssName = 'top';
-                        else if (j === height - 1) ssName = 'bottom';
-                        else                       ssName = 'center';
-                    }
 
-                    pieces[i][j] = Sprite('displayBox', 16, 16).addChildTo(displayElem)
-                                                       .setPosition((- width / 2 + i + 0.5) * 16, (- height / 2 + j + 0.5) * 16);
-                    piecesAnimation[i][j] = FrameAnimation('displayBox_ss').attachTo(pieces[i][j]);
-                    piecesAnimation[i][j].gotoAndPlay(ssName);
-                }
-            }
-            return displayElem;
-        }
 
         this.backgroundColor = 'black';
         this.dummyGroup = DisplayElement().addChildTo(this).setPosition(0, SCREEN_HEIGHT); // dummy group for waiting
@@ -364,7 +367,7 @@ phina.define('Main', {
         this.comboLabel.setPosition(SCORELABEL_RIGHT, 160);
         // score label
         this.scoreLabel = Label({
-            text: 'Score: ' + ( '00000000' + this.score ).slice(-8),
+            text: 'SCORE ' + ( '00000000' + this.score ).slice(-8),
             fontSize: 32,
             fill: 'white',
             fontFamily: "'Courier New'"
@@ -396,7 +399,7 @@ phina.define('Main', {
         this.levelTextLabel = Label({
             text: 'LEVEL',
             fontSize: 32,
-            fill: 'orange',
+            fill: 'lime',
             //stroke: 'orange',
             //strokeWidth: 8,
             fontFamily: "'Courier New'"
@@ -406,19 +409,28 @@ phina.define('Main', {
         this.levelLabel = Label({
             text: this.level,
             fontSize: 64,
-            fill: 'white',
-            stroke: 'orange',
-            strokeWidth: 8,
+            fill: 'lime',
+            //stroke: 'white',
+            //strokeWidth: 8,
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.levelLabel.origin.set(0.5, 0.5);
         this.levelLabel.setPosition(480, 308 + 20);
-
+        this.levelUpCountLabel = Label({
+            text: ( '00' + (this.levelStatus[this.level + 1].levelUp - this.totalEraseCount) ).slice(-2),
+            fontSize: 32,
+            fill: 'lime',
+            //stroke: 'lime',
+            //strokeWidth: 4,
+            fontFamily: "'Courier New'"
+        }).addChildTo(this.dummyGroup);
+        this.levelUpCountLabel.origin.set(0.5, 0.5);
+        this.levelUpCountLabel.setPosition(584, 342);
         // pushUpCounter label
         this.limitTextLabel = Label({
             text: 'LIMIT',
             fontSize: 32,
-            fill: 'tomato',
+            fill: 'gold',
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.limitTextLabel.origin.set(0.5, 0.5);
@@ -426,9 +438,9 @@ phina.define('Main', {
         this.pushUpCounterLabel = Label({
             text: '' + this.pushUplimit,
             fontSize: 64,
-            fill: 'white',
-            stroke: 'tomato',
-            strokeWidth: 8,
+            fill: 'gold',
+            //stroke: 'white',
+            //strokeWidth: 8,
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.pushUpCounterLabel.origin.set(0.5, 0.5);
@@ -436,9 +448,9 @@ phina.define('Main', {
         this.maxPushUpLabel = Label({
             text: '/' + this.pushUplimit,
             fontSize: 32,
-            fill: 'white',
-            stroke: 'tomato',
-            strokeWidth: 4,
+            fill: 'gold',
+            //stroke: 'tomato',
+            //strokeWidth: 4,
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.maxPushUpLabel.origin.set(0.5, 0.5);
@@ -696,7 +708,7 @@ phina.define('Main', {
                                   .by({y: -16, alpha: -1.0}, 100)
                                   .play();
         // update score
-        this.scoreLabel.text = 'Score: ' + ( '00000000' + this.score ).slice(-8);
+        this.scoreLabel.text = 'SCORE ' + ( '00000000' + this.score ).slice(-8);
         // update pushUpCounter display
         this.pushUpCounterLabel.text = '' + (this.pushUplimit - this.pushUpCounter);
         this.pushUpCounterLabel.tweener.to({scaleX: 0.8, scaleY: 0.8}, 100)
@@ -711,6 +723,13 @@ phina.define('Main', {
                                        .to({scaleX: 1.5, scaleY: 1.5, rotation: 180}, 100)
                                        .to({scaleX: 1.0, scaleY: 1.0, rotation: 360}, 100)
                                        .play();
+                // レベルアップまでに必要なブロック数の情報を更新
+                if (this.level != LEVEL_MAX){
+                    this.levelUpCountLabel.text = ( '00' + (this.levelStatus[this.level + 1].levelUp - this.totalEraseCount) ).slice(-2);
+                }
+                else{
+                    this.levelUpCountLabel.text = '00';
+                }
                 // 押し上げ限界値に変更があった場合アニメーションしつつ更新
                 if (this.pushUplimit != this.levelStatus[this.level].ojamaCount){
                     this.pushUplimit = this.levelStatus[this.level].ojamaCount;
@@ -721,6 +740,13 @@ phina.define('Main', {
                                                .to({scaleX: 1.0, scaleY: 1.0}, 100)
                                                .play();
                 }
+            }
+            else if (this.level === LEVEL_MAX){
+                this.levelUpCountLabel.text = '00';
+            }
+            else{
+                // レベルアップまでに必要なブロック数の情報を更新
+                this.levelUpCountLabel.text = ( '00' + (this.levelStatus[this.level + 1].levelUp - this.totalEraseCount) ).slice(-2);
             }
         }
         // wait -> goto fieldUpdate
@@ -941,6 +967,6 @@ phina.main(function(){
         scenes: MYSCENES,
         fps: 50
     });
-    app.enableStats();
+    //app.enableStats();
     app.run();
 })

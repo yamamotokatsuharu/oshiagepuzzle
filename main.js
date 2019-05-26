@@ -411,7 +411,7 @@ phina.define('Main', {
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.levelTextLabel.origin.set(0.5, 0.5);
-        this.levelTextLabel.setPosition(480, 288 - 26);
+        this.levelTextLabel.setPosition(scoreDisplayX, 288 - 26);
         this.levelLabel = Label({
             text: this.level,
             fontSize: 64,
@@ -421,7 +421,7 @@ phina.define('Main', {
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.levelLabel.origin.set(0.5, 0.5);
-        this.levelLabel.setPosition(480, 288 + 20);
+        this.levelLabel.setPosition(scoreDisplayX, 288 + 20);
         this.levelUpCountLabel = Label({
             text: ( '00' + (this.levelStatus[this.level + 1].levelUp - this.totalEraseCount) ).slice(-2),
             fontSize: 32,
@@ -431,7 +431,7 @@ phina.define('Main', {
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.levelUpCountLabel.origin.set(0.5, 0.5);
-        this.levelUpCountLabel.setPosition(584, 288 + 32 + 2);
+        this.levelUpCountLabel.setPosition(scoreDisplayX + 104, 288 + 32 + 2);
         // pushUpCounter label
         this.limitTextLabel = Label({
             text: 'LIMIT',
@@ -440,7 +440,7 @@ phina.define('Main', {
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.limitTextLabel.origin.set(0.5, 0.5);
-        this.limitTextLabel.setPosition(480, 432 - 26);
+        this.limitTextLabel.setPosition(scoreDisplayX, 432 - 26);
         this.pushUpCounterLabel = Label({
             text: '' + this.pushUplimit,
             fontSize: 64,
@@ -450,7 +450,7 @@ phina.define('Main', {
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.pushUpCounterLabel.origin.set(0.5, 0.5);
-        this.pushUpCounterLabel.setPosition(480, 432 + 20);
+        this.pushUpCounterLabel.setPosition(scoreDisplayX, 432 + 20);
         this.maxPushUpLabel = Label({
             text: '/' + this.pushUplimit,
             fontSize: 32,
@@ -460,7 +460,7 @@ phina.define('Main', {
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.maxPushUpLabel.origin.set(0.5, 0.5);
-        this.maxPushUpLabel.setPosition(584, 432 + 32 + 2);
+        this.maxPushUpLabel.setPosition(scoreDisplayX + 104, 432 + 32 + 2);
 
         // (debug) timecounter
         this.timeCountLabel = Label({

@@ -27,10 +27,10 @@ const MYSCENES = [
 const ASSETS = {
     image:{
         'block': 'img/block.png',
-        'field': 'img/field.png',
-        'background': 'img/background_1.png',
+        'field': 'img/field_2.png',
+        'background': 'img/background_2.png',
         'howto': 'img/howto.png',
-        'displayBox': 'img/displaybox.png'
+        'displayBox': 'img/displaybox_3.png'
     },
     spritesheet:{
         'block_ss': 'block_ss.json',
@@ -57,7 +57,7 @@ const FIELD_WIDTH = 6;
 const FIELD_HEIGHT = 11;
 const DISTANCE_FROM_FB_TO_PB = 16; // distance from bottom of field to push blocks
 const PUSHBLOCKS_Y = FIELD_Y + FIELD_HEIGHT * BLOCK_SIZE + DISTANCE_FROM_FB_TO_PB;
-const DISTANCE_BETWEEN_NEXTBLOCKS = 48;
+const DISTANCE_BETWEEN_NEXTBLOCKS = 96;
 const NEXTBLOCKS_X = FIELD_X + FIELD_WIDTH * BLOCK_SIZE + DISTANCE_BETWEEN_NEXTBLOCKS;
 const VISIBLE_NEXT = 4;
 const LEVEL_MAX = 6;
@@ -283,8 +283,10 @@ phina.define('Main', {
 
         this.joint = displayBox (this.puzzleFieldGroup, 10, 1).setPosition(400, PUSHBLOCKS_Y - 4);
         this.pushfieldDisplay = displayBox(this.puzzleFieldGroup, FIELD_WIDTH * 3 + 2,  5).setPosition(FIELD_X + FIELD_WIDTH * 48 / 2 - 24, PUSHBLOCKS_Y);
-        this.nextDisplay = displayBox(this.puzzleFieldGroup, 40, 5).setPosition(716, PUSHBLOCKS_Y);
-
+        this.nextDisplay = new Array(VISIBLE_NEXT);
+        for (let i = 0; i < VISIBLE_NEXT; i++){
+            this.nextDisplay[i] = displayBox(this.puzzleFieldGroup, 8, 5).setPosition(NEXTBLOCKS_X + 112 * i + BLOCK_SIZE / 2, PUSHBLOCKS_Y);
+        }
         /* Prepare push blocks */
         var pushBlocks = [Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this.dummyGroup), Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this.dummyGroup)];
         var pushBlocksAnimation = [FrameAnimation('block_ss').attachTo(pushBlocks[0]), FrameAnimation('block_ss').attachTo(pushBlocks[1])];
@@ -313,7 +315,7 @@ phina.define('Main', {
                 nextMap[i][j] = this.blockOrder[Random.randint(0, 5)];
                 nextBlocks[i][j] = Sprite('block', BLOCK_SIZE, BLOCK_SIZE).addChildTo(this.puzzleFieldGroup);
                 nextBlocksAnimation[i][j] = FrameAnimation('block_ss').attachTo(nextBlocks[i][j]).gotoAndPlay('block_' + nextMap[i][j]);
-                nextBlocks[i][j].moveTo(NEXTBLOCKS_X + 128 * i + BLOCK_SIZE * j, PUSHBLOCKS_Y);
+                nextBlocks[i][j].moveTo(NEXTBLOCKS_X + 112 * i + BLOCK_SIZE * j, PUSHBLOCKS_Y);
             }
         }
         this.nextMap = nextMap;
@@ -345,15 +347,19 @@ phina.define('Main', {
         this.totalEraseCount = 0; // トータルで消したブロックの個数
 
         /* score display flame */
+        var scoreDisplayX = (NEXTBLOCKS_X + BLOCK_SIZE / 2) + (10 * 16 - 8 * 16) / 2;
+
         this.scoreDisplay     = displayBox(this.dummyGroup, 26, 10).setPosition(656, 120);
-        this.levelDisplay     = displayBox(this.dummyGroup, 10,  8).setPosition(480, 308);
-        this.levelUpDisplay   = displayBox(this.dummyGroup,  5,  4).setPosition(584, 308 + 32);
-        this.pushUpDisplay    = displayBox(this.dummyGroup, 10,  8).setPosition(480, 450);
-        this.maxPushUpDisplay = displayBox(this.dummyGroup,  5,  4).setPosition(584, 450 + 32);
+        this.levelDisplay     = displayBox(this.dummyGroup, 10,  8).setPosition(scoreDisplayX, 288);
+        this.levelUpDisplay   = displayBox(this.dummyGroup,  5,  4).setPosition(scoreDisplayX + 104, 288 + 32);
+        this.pushUpDisplay    = displayBox(this.dummyGroup, 10,  8).setPosition(scoreDisplayX, 432);
+        this.maxPushUpDisplay = displayBox(this.dummyGroup,  5,  4).setPosition(scoreDisplayX + 104, 432 + 32);
 
         /* how to move block */
+        /*
         var howto = Sprite('howto').addChildTo(this.dummyGroup);
         howto.moveTo(760, 400);
+        */
 
         /* labels */
         // combo label
@@ -405,7 +411,7 @@ phina.define('Main', {
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.levelTextLabel.origin.set(0.5, 0.5);
-        this.levelTextLabel.setPosition(480, 308 - 26);
+        this.levelTextLabel.setPosition(480, 288 - 26);
         this.levelLabel = Label({
             text: this.level,
             fontSize: 64,
@@ -415,7 +421,7 @@ phina.define('Main', {
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.levelLabel.origin.set(0.5, 0.5);
-        this.levelLabel.setPosition(480, 308 + 20);
+        this.levelLabel.setPosition(480, 288 + 20);
         this.levelUpCountLabel = Label({
             text: ( '00' + (this.levelStatus[this.level + 1].levelUp - this.totalEraseCount) ).slice(-2),
             fontSize: 32,
@@ -425,7 +431,7 @@ phina.define('Main', {
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.levelUpCountLabel.origin.set(0.5, 0.5);
-        this.levelUpCountLabel.setPosition(584, 342);
+        this.levelUpCountLabel.setPosition(584, 288 + 32 + 2);
         // pushUpCounter label
         this.limitTextLabel = Label({
             text: 'LIMIT',
@@ -434,7 +440,7 @@ phina.define('Main', {
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.limitTextLabel.origin.set(0.5, 0.5);
-        this.limitTextLabel.setPosition(480, 450 - 26);
+        this.limitTextLabel.setPosition(480, 432 - 26);
         this.pushUpCounterLabel = Label({
             text: '' + this.pushUplimit,
             fontSize: 64,
@@ -444,7 +450,7 @@ phina.define('Main', {
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.pushUpCounterLabel.origin.set(0.5, 0.5);
-        this.pushUpCounterLabel.setPosition(480, 450 + 20);
+        this.pushUpCounterLabel.setPosition(480, 432 + 20);
         this.maxPushUpLabel = Label({
             text: '/' + this.pushUplimit,
             fontSize: 32,
@@ -454,7 +460,7 @@ phina.define('Main', {
             fontFamily: "'Courier New'"
         }).addChildTo(this.dummyGroup);
         this.maxPushUpLabel.origin.set(0.5, 0.5);
-        this.maxPushUpLabel.setPosition(584, 484);
+        this.maxPushUpLabel.setPosition(584, 432 + 32 + 2);
 
         // (debug) timecounter
         this.timeCountLabel = Label({

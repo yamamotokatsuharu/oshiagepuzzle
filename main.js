@@ -52,7 +52,7 @@ const EMPTY_ID = -1;
 const OJAMA_ID = 10;
 
 const FIELD_X = 100;
-const FIELD_Y = 8;
+const FIELD_Y = 4;
 const FIELD_WIDTH = 6;
 const FIELD_HEIGHT = 11;
 const DISTANCE_FROM_FB_TO_PB = 16; // distance from bottom of field to push blocks
